@@ -184,7 +184,7 @@ export default async function TafseerPage({ searchParams }: Props) {
           </svg>
         </div>
 
-        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20">
+        <div className="relative mx-auto max-w-7xl px-6 lg:px-8 py-16 md:py-20">
           <div className="mb-5 flex items-center gap-3">
             <div className="h-px w-10 bg-[#d6b56d]" />
 

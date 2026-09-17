@@ -1,3 +1,6 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
 type SurahHeaderProps = {
   number: number;
   name: string;
@@ -61,9 +64,18 @@ export default function SurahHeader({
       </div>
 
       <div className="relative mx-auto max-w-6xl px-6 py-14 md:py-16">
+        <Link
+            href="/quran"
+            className="mb-10 inline-flex items-center gap-2 text-sm text-stone-400 transition hover:text-[#d6b56d]"
+          >
+            <ArrowLeft size={17} />
+            Back to Quran
+          </Link>
         {/* Top Label */}
         <div className="mb-8 flex items-center gap-3">
+          
           <div className="h-px w-10 bg-[#d6b56d]" />
+          
 
           <span className="text-xs font-medium uppercase tracking-[0.3em] text-[#d6b56d]">
             Holy Quran

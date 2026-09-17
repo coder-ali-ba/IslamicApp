@@ -59,7 +59,7 @@ export default function QuranHero() {
         </svg>
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
+      <div className="relative mx-auto max-w-7xl px-5 py-6 lg:px-8 lg:py-12">
         <div className="grid items-center gap-12 lg:grid-cols-[1fr_420px]">
           {/* Left Content */}
           <div>

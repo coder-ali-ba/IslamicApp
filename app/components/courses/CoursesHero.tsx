@@ -1,6 +1,14 @@
-import { BookOpen, Quote } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 
-export default function HadithHero() {
+type CoursesHeroProps = {
+  search: string;
+  onSearchChange: (value: string) => void;
+};
+
+export default function CoursesHero({
+  search,
+  onSearchChange,
+}: CoursesHeroProps) {
   return (
     <section className="relative overflow-hidden bg-stone-900 text-white">
       {/* Background Decorations */}
@@ -10,11 +18,11 @@ export default function HadithHero() {
         <div className="absolute -right-28 -top-28 h-[300px] w-[300px] rounded-full border border-[#d6b56d]/10" />
         <div className="absolute -right-16 -top-16 h-[180px] w-[180px] rounded-full border border-[#d6b56d]/10" />
 
-        {/* Bottom Left Rings */}
+        {/* Bottom Left Ring */}
         <div className="absolute -bottom-48 -left-40 h-[500px] w-[500px] rounded-full border border-white/5" />
         <div className="absolute -bottom-32 -left-24 h-[350px] w-[350px] rounded-full border border-white/[0.04]" />
 
-        {/* Gold Glow */}
+        {/* Soft Gold Glow */}
         <div className="absolute bottom-10 left-1/3 h-40 w-40 rounded-full bg-[#d6b56d]/5 blur-3xl" />
       </div>
 
@@ -26,7 +34,7 @@ export default function HadithHero() {
         >
           <defs>
             <pattern
-              id="hadith-pattern"
+              id="courses-pattern"
               width="90"
               height="90"
               patternUnits="userSpaceOnUse"
@@ -65,7 +73,7 @@ export default function HadithHero() {
           <rect
             width="100%"
             height="100%"
-            fill="url(#hadith-pattern)"
+            fill="url(#courses-pattern)"
           />
         </svg>
       </div>
@@ -87,7 +95,7 @@ export default function HadithHero() {
                 </p>
 
                 <p className="text-sm font-medium text-[#d6b56d]">
-                  Hadith & Sunnah
+                  IlmHub Courses
                 </p>
               </div>
             </div>
@@ -95,106 +103,114 @@ export default function HadithHero() {
             {/* Heading */}
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
               Learn.
-              <span className="text-[#d6b56d]"> Reflect.</span>
+              <span className="text-[#d6b56d]"> Understand.</span>
               <br />
-              Follow the Sunnah.
+              Practice.
             </h1>
 
             {/* Description */}
             <p className="mt-6 max-w-2xl text-base leading-8 text-stone-300 sm:text-lg">
-              Explore authentic sayings, teachings, and traditions
-              of the Prophet Muhammad ﷺ through well-known Hadith
-              collections.
+              Explore structured courses in Quran, Hadith, Arabic,
+              Fiqh, Seerah and Islamic Studies — designed to help
+              you learn with understanding and practice with purpose.
             </p>
+
+            {/* Search */}
+            <div className="mt-9 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) =>
+                    onSearchChange(e.target.value)
+                  }
+                  placeholder="Search courses, subjects or instructors..."
+                  className="w-full rounded-2xl border border-stone-700 bg-stone-900/80 py-4 pl-13 pr-5 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-stone-500 focus:border-[#d6b56d]/60 focus:ring-2 focus:ring-[#d6b56d]/10"
+                />
+              </div>
+            </div>
 
             {/* Stats */}
             <div className="mt-9 flex flex-wrap gap-3">
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  6
+                  6+
                 </p>
                 <p className="text-xs text-stone-400">
-                  Collections
+                  Categories
                 </p>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  Arabic
+                  100+
                 </p>
                 <p className="text-xs text-stone-400">
-                  Original Text
+                  Lessons
                 </p>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  Urdu
+                  All
                 </p>
                 <p className="text-xs text-stone-400">
-                  Translation
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
-                <p className="text-xl font-semibold text-white">
-                  English
-                </p>
-                <p className="text-xs text-stone-400">
-                  Translation
+                  Learning Levels
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Hadith Card */}
+          {/* Right Featured Course */}
           <div className="relative">
             {/* Glow */}
             <div className="absolute inset-0 rounded-[2rem] bg-[#d6b56d]/5 blur-2xl" />
 
-            <div className="relative rounded-[2rem] border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm sm:p-9">
-              {/* Quote Icon */}
-              <div className="flex justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d6b56d]/20 bg-[#d6b56d]/10">
-                  <Quote
-                    size={20}
-                    className="text-[#d6b56d]"
-                  />
-                </div>
-              </div>
-
-              {/* Decorative Line */}
-              <div className="my-7 flex items-center justify-center gap-3">
+            <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm sm:p-9">
+              {/* Decorative Top */}
+              <div className="mb-7 flex items-center justify-center gap-3">
                 <div className="h-px w-12 bg-[#d6b56d]/40" />
+
                 <span className="text-[#d6b56d]">✦</span>
+
                 <div className="h-px w-12 bg-[#d6b56d]/40" />
               </div>
 
               {/* Small Label */}
               <p className="text-center text-xs font-medium uppercase tracking-[0.25em] text-stone-500">
-                Words of the Prophet ﷺ
+                Begin Your Journey
               </p>
+
+              {/* Main Text */}
+              <h2 className="mt-5 text-center text-3xl font-semibold leading-tight text-white">
+                Knowledge is a
+                <span className="block text-[#d6b56d]">
+                  Journey.
+                </span>
+              </h2>
 
               {/* Arabic */}
               <p
                 dir="rtl"
                 lang="ar"
                 translate="no"
-                className="mt-7 text-center font-serif text-3xl leading-[2.1] text-[#f5e7c1] sm:text-4xl"
+                className="mt-8 text-center font-serif text-3xl leading-[2] text-[#f5e7c1] sm:text-4xl"
               >
-                إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ
+                وَقُلْ رَبِّ زِدْنِي عِلْمًا
               </p>
 
               {/* Translation */}
               <div className="mt-7 border-t border-white/10 pt-6">
                 <p className="text-center text-sm italic leading-7 text-stone-400">
-                  “Actions are judged by intentions.”
+                  And say, “My Lord, increase me in knowledge.”
                 </p>
               </div>
 
               {/* Reference */}
               <p className="mt-5 text-center text-xs font-medium uppercase tracking-[0.2em] text-[#d6b56d]/70">
-                Sahih al-Bukhari • 1
+                Surah Taha • 20:114
               </p>
 
               {/* Bottom Ornament */}

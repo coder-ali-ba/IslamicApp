@@ -1,20 +1,28 @@
-import { BookOpen, Quote } from "lucide-react";
+"use client";
 
-export default function HadithHero() {
+import { BookOpen, Search } from "lucide-react";
+
+type ClassesHeroProps = {
+  search: string;
+  onSearchChange: (value: string) => void;
+};
+
+export default function ClassesHero({
+  search,
+  onSearchChange,
+}: ClassesHeroProps) {
   return (
     <section className="relative overflow-hidden bg-stone-900 text-white">
       {/* Background Decorations */}
       <div className="pointer-events-none absolute inset-0">
-        {/* Top Right Rings */}
         <div className="absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full border border-[#d6b56d]/10" />
+
         <div className="absolute -right-28 -top-28 h-[300px] w-[300px] rounded-full border border-[#d6b56d]/10" />
+
         <div className="absolute -right-16 -top-16 h-[180px] w-[180px] rounded-full border border-[#d6b56d]/10" />
 
-        {/* Bottom Left Rings */}
         <div className="absolute -bottom-48 -left-40 h-[500px] w-[500px] rounded-full border border-white/5" />
-        <div className="absolute -bottom-32 -left-24 h-[350px] w-[350px] rounded-full border border-white/[0.04]" />
 
-        {/* Gold Glow */}
         <div className="absolute bottom-10 left-1/3 h-40 w-40 rounded-full bg-[#d6b56d]/5 blur-3xl" />
       </div>
 
@@ -26,7 +34,7 @@ export default function HadithHero() {
         >
           <defs>
             <pattern
-              id="hadith-pattern"
+              id="classes-pattern"
               width="90"
               height="90"
               patternUnits="userSpaceOnUse"
@@ -57,7 +65,6 @@ export default function HadithHero() {
                 r="5"
                 fill="none"
                 stroke="white"
-                strokeWidth="1"
               />
             </pattern>
           </defs>
@@ -65,17 +72,16 @@ export default function HadithHero() {
           <rect
             width="100%"
             height="100%"
-            fill="url(#hadith-pattern)"
+            fill="url(#classes-pattern)"
           />
         </svg>
       </div>
 
-      {/* Main Content */}
+      {/* Content */}
       <div className="relative mx-auto max-w-7xl px-5 py-6 lg:px-8 lg:py-12">
         <div className="grid items-center gap-12 lg:grid-cols-[1fr_420px]">
-          {/* Left Content */}
+          {/* Left */}
           <div>
-            {/* Label */}
             <div className="mb-6 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#d6b56d]/20 bg-[#d6b56d]/10 text-[#d6b56d]">
                 <BookOpen size={21} />
@@ -83,121 +89,120 @@ export default function HadithHero() {
 
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-stone-500">
-                  Explore
+                  Learn Together
                 </p>
 
                 <p className="text-sm font-medium text-[#d6b56d]">
-                  Hadith & Sunnah
+                  Live Islamic Classes
                 </p>
               </div>
             </div>
 
-            {/* Heading */}
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
               Learn.
-              <span className="text-[#d6b56d]"> Reflect.</span>
+              <span className="text-[#d6b56d]"> Connect.</span>
               <br />
-              Follow the Sunnah.
+              Grow Together.
             </h1>
 
-            {/* Description */}
             <p className="mt-6 max-w-2xl text-base leading-8 text-stone-300 sm:text-lg">
-              Explore authentic sayings, teachings, and traditions
-              of the Prophet Muhammad ﷺ through well-known Hadith
-              collections.
+              Join live classes with experienced instructors and
+              learn Quran, Tajweed, Arabic, Hadith and Fiqh in a
+              focused learning environment.
             </p>
+
+            {/* Search */}
+            <div className="mt-9 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) =>
+                    onSearchChange(e.target.value)
+                  }
+                  placeholder="Search classes, subjects or instructors..."
+                  className="w-full rounded-2xl border border-stone-700 bg-stone-900/80 py-4 pl-13 pr-5 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-stone-500 focus:border-[#d6b56d]/60 focus:ring-2 focus:ring-[#d6b56d]/10"
+                />
+              </div>
+            </div>
 
             {/* Stats */}
             <div className="mt-9 flex flex-wrap gap-3">
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  6
+                  Live
                 </p>
                 <p className="text-xs text-stone-400">
-                  Collections
+                  Sessions
                 </p>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  Arabic
+                  5+
                 </p>
                 <p className="text-xs text-stone-400">
-                  Original Text
+                  Subjects
                 </p>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
                 <p className="text-xl font-semibold text-white">
-                  Urdu
+                  Small
                 </p>
                 <p className="text-xs text-stone-400">
-                  Translation
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
-                <p className="text-xl font-semibold text-white">
-                  English
-                </p>
-                <p className="text-xs text-stone-400">
-                  Translation
+                  Class Groups
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Right Hadith Card */}
+          {/* Right Card */}
           <div className="relative">
-            {/* Glow */}
             <div className="absolute inset-0 rounded-[2rem] bg-[#d6b56d]/5 blur-2xl" />
 
             <div className="relative rounded-[2rem] border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm sm:p-9">
-              {/* Quote Icon */}
-              <div className="flex justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d6b56d]/20 bg-[#d6b56d]/10">
-                  <Quote
-                    size={20}
-                    className="text-[#d6b56d]"
-                  />
-                </div>
-              </div>
-
-              {/* Decorative Line */}
-              <div className="my-7 flex items-center justify-center gap-3">
+              {/* Top Ornament */}
+              <div className="mb-7 flex items-center justify-center gap-3">
                 <div className="h-px w-12 bg-[#d6b56d]/40" />
+
                 <span className="text-[#d6b56d]">✦</span>
+
                 <div className="h-px w-12 bg-[#d6b56d]/40" />
               </div>
 
-              {/* Small Label */}
               <p className="text-center text-xs font-medium uppercase tracking-[0.25em] text-stone-500">
-                Words of the Prophet ﷺ
+                Learn & Practice
               </p>
 
-              {/* Arabic */}
+              <h2 className="mt-5 text-center text-3xl font-semibold leading-tight">
+                Knowledge grows
+                <span className="block text-[#d6b56d]">
+                  when shared.
+                </span>
+              </h2>
+
               <p
                 dir="rtl"
                 lang="ar"
                 translate="no"
-                className="mt-7 text-center font-serif text-3xl leading-[2.1] text-[#f5e7c1] sm:text-4xl"
+                className="mt-8 text-center font-serif text-3xl leading-[2] text-[#f5e7c1] sm:text-4xl"
               >
-                إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ
+                فَاسْأَلُوا أَهْلَ الذِّكْرِ
               </p>
 
-              {/* Translation */}
               <div className="mt-7 border-t border-white/10 pt-6">
                 <p className="text-center text-sm italic leading-7 text-stone-400">
-                  “Actions are judged by intentions.”
+                  “So ask the people of knowledge if you do not know.”
                 </p>
               </div>
 
-              {/* Reference */}
               <p className="mt-5 text-center text-xs font-medium uppercase tracking-[0.2em] text-[#d6b56d]/70">
-                Sahih al-Bukhari • 1
+                Surah An-Nahl • 16:43
               </p>
 
-              {/* Bottom Ornament */}
               <div className="mt-7 flex items-center justify-center gap-2">
                 <span className="h-1 w-1 rounded-full bg-[#d6b56d]/60" />
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d6b56d]" />
@@ -223,4 +228,3 @@ export default function HadithHero() {
     </section>
   );
 }
-

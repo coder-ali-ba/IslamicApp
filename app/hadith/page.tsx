@@ -1,55 +1,49 @@
 import HadithHero from "@/app/components/hadith/HadithHero";
-import HadithSearch from "../components/hadith/HadithSearch";
-import HadithCollectionCard from "../components/hadith/HadithCollectionCard";
-import HadithReader from "../components/hadith/HadithReader";
+import HadithSearch from "@/app/components/hadith/HadithSearch";
+import HadithCollectionCard from "@/app/components/hadith/HadithCollectionCard";
+
 const collections = [
   {
     name: "Sahih al-Bukhari",
     arabicName: "صحيح البخاري",
     description:
-      "One of the most widely studied collections of authentic Hadith.",
-    hadithCount: "7,500+",
+      "A major collection of Hadith compiled by Imam al-Bukhari.",
     slug: "bukhari",
   },
   {
     name: "Sahih Muslim",
     arabicName: "صحيح مسلم",
     description:
-      "A major collection of authentic sayings and traditions of the Prophet ﷺ.",
-    hadithCount: "7,500+",
+      "One of the major collections of authentic Hadith compiled by Imam Muslim.",
     slug: "muslim",
   },
   {
     name: "Sunan Abu Dawud",
     arabicName: "سنن أبي داود",
     description:
-      "A renowned collection with a strong focus on Hadith related to Islamic rulings.",
-    hadithCount: "5,200+",
-    slug: "abu-dawud",
+      "A major Hadith collection with a strong focus on narrations related to Islamic rulings.",
+    slug: "abudawud",
   },
   {
     name: "Jami` at-Tirmidhi",
     arabicName: "جامع الترمذي",
     description:
-      "A comprehensive collection covering Hadith, rulings, and scholarly commentary.",
-    hadithCount: "3,900+",
+      "A well-known Hadith collection covering narrations, rulings, and scholarly commentary.",
     slug: "tirmidhi",
   },
   {
     name: "Sunan an-Nasa'i",
     arabicName: "سنن النسائي",
     description:
-      "A respected Hadith collection known for its detailed treatment of narrations.",
-    hadithCount: "5,700+",
+      "A respected collection of Hadith compiled by Imam an-Nasa'i.",
     slug: "nasai",
   },
   {
     name: "Sunan Ibn Majah",
     arabicName: "سنن ابن ماجه",
     description:
-      "One of the major Sunni Hadith collections containing narrations across many subjects.",
-    hadithCount: "4,300+",
-    slug: "ibn-majah",
+      "One of the major Sunni Hadith collections covering many subjects.",
+    slug: "ibnmajah",
   },
 ];
 
@@ -57,53 +51,38 @@ export default function HadithPage() {
   return (
     <main className="min-h-screen bg-[#faf9f6]">
       <HadithHero />
+
       <HadithSearch />
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-  <div className="mb-8">
-    <p className="text-xs font-medium uppercase tracking-[0.25em] text-[#967438]">
-      Collections
-    </p>
 
-    <h2 className="mt-2 text-2xl font-semibold text-stone-900 md:text-3xl">
-      Hadith Collections
-    </h2>
+      <section className="mx-auto max-w-7xl px-6 pb-16">
+        <div className="mb-8">
+          <p className="text-xs font-medium uppercase tracking-[0.25em] text-[#967438]">
+            Collections
+          </p>
 
-    <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-      Explore well-known collections of Hadith and discover
-      narrations organized by their original sources.
-    </p>
-  </div>
+          <h2 className="mt-2 text-2xl font-semibold text-stone-900 md:text-3xl">
+            Explore Hadith Collections
+          </h2>
 
-  <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-    {collections.map((collection) => (
-      <HadithCollectionCard
-        key={collection.slug}
-        {...collection}
-      />
-    ))}
-  </div>
-</section>
-<section className="mx-auto max-w-4xl px-6 pb-20">
-  <div className="mb-8">
-    <p className="text-xs font-medium uppercase tracking-[0.25em] text-[#967438]">
-      Hadith Reader
-    </p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
+            Browse well-known Hadith collections and explore their books,
+            chapters, and narrations.
+          </p>
+        </div>
 
-    <h2 className="mt-2 text-2xl font-semibold text-stone-900 md:text-3xl">
-      Read Hadith
-    </h2>
-  </div>
-
-  <HadithReader
-    hadithNumber="1"
-    arabic="إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ"
-    translation="Actions are judged by intentions, and every person will have what they intended."
-    collectionName="Sahih al-Bukhari"
-    bookName="Revelation"
-    chapterName="How the Divine Revelation started"
-    language="english"
-  />
-</section>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {collections.map((collection) => (
+            <HadithCollectionCard
+              key={collection.slug}
+              name={collection.name}
+              arabicName={collection.arabicName}
+              description={collection.description}
+              hadithCount="Explore"
+              slug={collection.slug}
+            />
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
