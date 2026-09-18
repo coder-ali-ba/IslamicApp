@@ -4,7 +4,8 @@ export type TeacherSubject =
   | "Hadith"
   | "Arabic"
   | "Fiqh"
-  | "Seerah";
+  | "Seerah"
+  |"Islamic Studies";
 
 export type Teacher = {
   id: string;
@@ -91,7 +92,7 @@ export const teachers: Teacher[] = [
     name: "Mufti Abdullah",
     title: "Fiqh & Islamic Jurisprudence Instructor",
     bio: "Focused on teaching practical Fiqh and helping students understand Islamic rulings related to everyday life.",
-    subjects: ["Fiqh", "Islamic Studies" as TeacherSubject],
+    subjects: ["Fiqh", "Islamic Studies" ],
     qualification: "Islamic Jurisprudence",
     experience: "15+ Years",
     students: 1120,
@@ -107,7 +108,7 @@ export const teachers: Teacher[] = [
     name: "Dr. Hamza Malik",
     title: "Seerah & Islamic History Instructor",
     bio: "Passionate educator teaching the life of the Prophet ﷺ and important lessons from Islamic history.",
-    subjects: ["Seerah", "Islamic Studies" as TeacherSubject],
+    subjects: ["Seerah", "Islamic Studies"],
     qualification: "Islamic History & Studies",
     experience: "9+ Years",
     students: 1680,

@@ -1,9 +1,7 @@
 import BooksSearch from "@/app/components/hadith/BookSearch";
 
-
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
-
 
 type CollectionPageProps = {
   params: Promise<{
@@ -60,9 +58,7 @@ function parseToonRow(line: string): string[] {
   return result;
 }
 
-async function getBooks(
-  collection: string
-): Promise<Book[]> {
+async function getBooks(collection: string): Promise<Book[]> {
   try {
     const url = `https://cdn.jsdelivr.net/gh/HsnSaboor/hadith-api-toon@main/editions/${collection}/info.toon`;
 
@@ -73,7 +69,7 @@ async function getBooks(
     if (!response.ok) {
       console.error(
         "Failed to fetch Hadith book information:",
-        response.status
+        response.status,
       );
 
       return [];
@@ -90,20 +86,16 @@ async function getBooks(
      */
 
     const sectionsMatch = text.match(
-      /sections\[\d+\]\{([^}]+)\}:\s*\n?([\s\S]*?)(?=\n(?:translations|$)|$)/
+      /sections\[\d+\]\{([^}]+)\}:\s*\n?([\s\S]*?)(?=\n(?:translations|$)|$)/,
     );
 
     if (!sectionsMatch) {
-      console.error(
-        "Sections data not found in info.toon"
-      );
+      console.error("Sections data not found in info.toon");
 
       return [];
     }
 
-    const columns = sectionsMatch[1]
-      .split(",")
-      .map((column) => column.trim());
+    const columns = sectionsMatch[1].split(",").map((column) => column.trim());
 
     const sectionData = sectionsMatch[2]
       .split("\n")
@@ -121,9 +113,7 @@ async function getBooks(
       nameEnIndex === -1 ||
       nameUrIndex === -1
     ) {
-      console.error(
-        "Required multilingual title fields are missing."
-      );
+      console.error("Required multilingual title fields are missing.");
 
       return [];
     }
@@ -151,27 +141,18 @@ async function getBooks(
           english: values[nameEnIndex] || "",
         };
       })
-      .filter(
-        (book): book is Book =>
-          book !== null
-      );
+      .filter((book): book is Book => book !== null);
   } catch (error) {
-    console.error(
-      "Failed to load Hadith book information:",
-      error
-    );
+    console.error("Failed to load Hadith book information:", error);
 
     return [];
   }
 }
 
-export default async function CollectionPage({
-  params,
-}: CollectionPageProps) {
+export default async function CollectionPage({ params }: CollectionPageProps) {
   const { collection } = await params;
 
-  const collectionName =
-    collectionNames[collection] || collection;
+  const collectionName = collectionNames[collection] || collection;
 
   const books = await getBooks(collection);
 
@@ -182,66 +163,64 @@ export default async function CollectionPage({
       ===================================================== */}
 
       <section className="relative overflow-hidden border-b border-stone-800 bg-stone-900 text-white">
-  {/* Decorative Rings */}
-  <div className="pointer-events-none absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full border border-[#d6b56d]/10" />
+        {/* Decorative Rings */}
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[420px] w-[420px] rounded-full border border-[#d6b56d]/10" />
 
-  <div className="pointer-events-none absolute -right-24 -top-24 h-[300px] w-[300px] rounded-full border border-[#d6b56d]/10" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-[300px] w-[300px] rounded-full border border-[#d6b56d]/10" />
 
-  <div className="pointer-events-none absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-[#d6b56d]/5 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-[#d6b56d]/5 blur-3xl" />
 
-  {/* Islamic Pattern */}
-  <div
-    className="pointer-events-none absolute inset-0 opacity-[0.035]"
-    style={{
-      backgroundImage: `
+        {/* Islamic Pattern */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: `
         linear-gradient(30deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
         linear-gradient(150deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
         linear-gradient(30deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
         linear-gradient(150deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d)
       `,
-      backgroundSize: "80px 140px",
-      backgroundPosition: "0 0, 0 0, 40px 70px, 40px 70px",
-    }}
-  />
+            backgroundSize: "80px 140px",
+            backgroundPosition: "0 0, 0 0, 40px 70px, 40px 70px",
+          }}
+        />
 
-  <div className="relative mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8 lg:py-20">
-    <div className="max-w-3xl">
+        <div className="relative mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="max-w-3xl">
+            {/* Label */}
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d6b56d]/25 bg-[#d6b56d]/10">
+                <BookOpen
+                  className="h-4 w-4 text-[#d6b56d]"
+                  strokeWidth={1.8}
+                />
+              </div>
 
-      {/* Label */}
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d6b56d]/25 bg-[#d6b56d]/10">
-          <BookOpen
-            className="h-4 w-4 text-[#d6b56d]"
-            strokeWidth={1.8}
-          />
+              <span className="text-xs font-medium uppercase tracking-[0.22em] text-[#d6b56d]">
+                Hadith Collection
+              </span>
+            </div>
+
+            {/* Heading */}
+            <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              {collectionName}
+            </h1>
+
+            {/* Description */}
+            <p className="mt-5 max-w-2xl text-sm leading-7 text-stone-300 sm:text-base">
+              Browse the books and chapters of this Hadith collection and
+              explore its narrations in a clear and organized way.
+            </p>
+
+            {/* Bottom Accent */}
+            <div className="mt-8 flex items-center gap-3">
+              <div className="h-px w-12 bg-[#d6b56d]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-[#d6b56d]" />
+              <div className="h-px w-20 bg-stone-700" />
+            </div>
+          </div>
         </div>
-
-        <span className="text-xs font-medium uppercase tracking-[0.22em] text-[#d6b56d]">
-          Hadith Collection
-        </span>
-      </div>
-
-      {/* Heading */}
-      <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-        {collectionName}
-      </h1>
-
-      {/* Description */}
-      <p className="mt-5 max-w-2xl text-sm leading-7 text-stone-300 sm:text-base">
-        Browse the books and chapters of this Hadith collection
-        and explore its narrations in a clear and organized way.
-      </p>
-
-      {/* Bottom Accent */}
-      <div className="mt-8 flex items-center gap-3">
-        <div className="h-px w-12 bg-[#d6b56d]" />
-        <div className="h-1.5 w-1.5 rounded-full bg-[#d6b56d]" />
-        <div className="h-px w-20 bg-stone-700" />
-      </div>
-
-    </div>
-  </div>
-</section>
+      </section>
 
       {/* =====================================================
           BOOKS
@@ -250,9 +229,7 @@ export default async function CollectionPage({
       <section className=" py-12">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-stone-900">
-              Books
-            </h2>
+            <h2 className="text-2xl font-semibold text-stone-900">Books</h2>
 
             <p className="mt-2 text-sm text-stone-500">
               Select a book to explore its Hadiths.
@@ -261,20 +238,12 @@ export default async function CollectionPage({
 
           {books.length === 0 ? (
             <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
-              <BookOpen
-                size={38}
-                className="mx-auto text-stone-300"
-              />
+              <BookOpen size={38} className="mx-auto text-stone-300" />
 
-              <p className="mt-4 text-stone-500">
-                Books could not be loaded.
-              </p>
+              <p className="mt-4 text-stone-500">Books could not be loaded.</p>
             </div>
           ) : (
-            <BooksSearch
-              books={books}
-              collection={collection}
-            />
+            <BooksSearch books={books} collection={collection} />
           )}
         </div>
       </section>
