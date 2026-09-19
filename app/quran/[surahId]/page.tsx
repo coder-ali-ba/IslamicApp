@@ -3,6 +3,8 @@ import SurahHeader from "@/app/components/quran/SurahHeader";
 import AyahCard from "@/app/components/quran/AyahCard";
 import QuranReaderControls from "@/app/components/quran/QuranReaderControls";
 import { surahs } from "@/app/src/lib/surah";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type Props = {
   params: Promise<{
@@ -124,6 +126,7 @@ export default async function SurahPage({
       className="min-h-screen bg-[#faf9f6]"
       translate="no"
     >
+      <Navbar />
       <SurahHeader
         number={surah.id}
         name={surah.name}
@@ -185,6 +188,7 @@ export default async function SurahPage({
           Quran data provided by Quran Foundation
         </p>
       </section>
+      <Footer />
     </main>
   );
 }

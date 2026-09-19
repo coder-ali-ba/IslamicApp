@@ -10,13 +10,34 @@ import {
 } from "lucide-react";
 
 import { fatwas } from "@/app/src/lib/fatwa";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type Props = {
   params: Promise<{
     slug: string;
   }>;
 };
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { slug } = await params;
 
+  const fatwa = fatwas.find((item) => item.slug === slug);
+
+  if (!fatwa) {
+    return {
+      title: "Fatwa Not Found",
+      description: "The requested Islamic guidance could not be found.",
+    };
+  }
+
+  return {
+    title: fatwa.question,
+    description: fatwa.shortAnswer,
+  };
+}
 export default async function FatwaDetailPage({ params }: Props) {
   const { slug } = await params;
 
@@ -35,6 +56,7 @@ export default async function FatwaDetailPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-[#faf9f6] text-stone-900">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-950 text-white">
         {/* Decorative circles */}
@@ -277,6 +299,7 @@ export default async function FatwaDetailPage({ params }: Props) {
           </div>
         </section>
       )}
+      <Footer />
     </main>
   );
 }

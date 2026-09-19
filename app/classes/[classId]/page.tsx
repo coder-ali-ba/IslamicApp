@@ -14,12 +14,39 @@ import {
 
 import { classes } from "@/app/src/lib/classes";
 import { classDetails } from "@/app/src/lib/class-details";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type ClassDetailsPageProps = {
   params: Promise<{
     classId: string;
   }>;
 };
+type Props = {
+  params: Promise<{
+    classId: string;
+  }>;
+};
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { classId } = await params;
+
+  const liveClass = classes.find((item) => item.id === classId);
+
+  if (!liveClass) {
+    return {
+      title: "Class Not Found",
+      description: "The requested Islamic class could not be found.",
+    };
+  }
+
+  return {
+    title: liveClass.title,
+    description: liveClass.description,
+  };
+}
 
 export default async function ClassDetailsPage({
   params,
@@ -46,6 +73,7 @@ export default async function ClassDetailsPage({
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
         {/* Islamic pattern */}
@@ -442,6 +470,7 @@ export default async function ClassDetailsPage({
           </Link>
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

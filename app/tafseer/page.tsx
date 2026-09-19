@@ -3,6 +3,15 @@ import { surahs } from "@/app/src/lib/surah";
 
 import TafseerControls from "@/app/components/tafseer/TafseerControll";
 import TafseerAyahCard from "@/app/components/tafseer/TafseerAyahCard";
+import { Metadata } from "next";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+
+export const metadata: Metadata = {
+  title: "Tafseer",
+  description:
+    "Explore Quran Tafseer and deepen your understanding of the meanings and teachings of the Quran.",
+};
 
 type Props = {
   searchParams: Promise<{
@@ -151,6 +160,7 @@ export default async function TafseerPage({ searchParams }: Props) {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
         <div className="pointer-events-none absolute inset-0 opacity-[0.035]">
@@ -270,6 +280,7 @@ export default async function TafseerPage({ searchParams }: Props) {
           Tafseer data provided by Quran Foundation
         </p>
       </section>
+      <Footer />
     </main>
   );
 }

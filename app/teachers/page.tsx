@@ -11,6 +11,8 @@ import {
   TeacherSubject,
   teachers,
 } from "@/app/src/lib/teachers";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function TeachersPage() {
   const [search, setSearch] = useState("");
@@ -55,6 +57,7 @@ export default function TeachersPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       <TeachersHero
         search={search}
         onSearchChange={setSearch}
@@ -183,6 +186,7 @@ export default function TeachersPage() {
           )}
         </section>
       </section>
+      <Footer />
     </main>
   );
 }

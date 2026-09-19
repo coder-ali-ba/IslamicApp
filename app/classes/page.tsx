@@ -11,6 +11,8 @@ import {
   type ClassCategory,
   type ClassLevel,
 } from "@/app/src/lib/classes";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function ClassesPage() {
   const [search, setSearch] = useState("");
@@ -67,6 +69,7 @@ export default function ClassesPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       <ClassesHero
         search={search}
         onSearchChange={setSearch}
@@ -164,6 +167,7 @@ export default function ClassesPage() {
           )}
         </section>
       </section>
+      <Footer />
     </main>
   );
 }

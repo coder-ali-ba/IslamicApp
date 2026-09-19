@@ -13,6 +13,8 @@ import {
   fatwaCategories,
   type FatwaCategory,
 } from "@/app/src/lib/fatwa";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function FatwaPage() {
   const [selectedCategory, setSelectedCategory] =
@@ -37,6 +39,7 @@ export default function FatwaPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f6] text-stone-900">
+      <Navbar />
       <FatwaHero />
 
       <FatwaCategories
@@ -111,6 +114,7 @@ export default function FatwaPage() {
           <AskFatwaForm />
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

@@ -1,4 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About",
+  description:
+    "Learn about IlmHub and our mission to make authentic Islamic knowledge accessible.",
+};
+
+
 import {
   ArrowRight,
   BookOpen,
@@ -10,10 +19,13 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
         {/* Islamic pattern */}
@@ -409,6 +421,7 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

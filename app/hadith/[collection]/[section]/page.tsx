@@ -1,6 +1,9 @@
 import Link from "next/link";
 import HadithSearch from "@/app/components/hadith/OneHadithSearch";
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type HadithGrade = {
   name?: string;
@@ -28,6 +31,32 @@ type CombinedHadith = {
   urdu: string;
   grades: string[];
 };
+type Props = {
+  params: Promise<{
+    section: string;
+    collection: string;
+  }>;
+};
+
+
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { collection, section } = await params;
+
+  const collectionName = collection
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const sectionName = section
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return {
+    title: `${sectionName} — ${collectionName}`,
+    description: `Read Hadith from the ${sectionName} section of ${collectionName} on IlmHub.`,
+  };
+}
 
 async function getBook(
   collection: string,
@@ -188,6 +217,7 @@ export default async function HadithSectionPage({
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Header */}
       <section className="relative overflow-hidden border-b border-stone-800 bg-stone-950 text-white">
         {/* Decorative Rings */}
@@ -317,6 +347,7 @@ export default async function HadithSectionPage({
           <HadithSearch hadiths={hadiths} />
         )}
       </section>
+      <Footer />
     </main>
   );
 }

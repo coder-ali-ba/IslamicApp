@@ -15,12 +15,41 @@ import {
 import { teachers } from "@/app/src/lib/teachers";
 import { courses } from "@/app/src/lib/course";
 import { classes } from "@/app/src/lib/classes";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type TeacherProfilePageProps = {
   params: Promise<{
     teacherId: string;
   }>;
 };
+
+type Props = {
+  params: Promise<{
+    teacherId: string;
+  }>;
+};
+
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { teacherId } = await params;
+
+  const teacher = teachers.find((item) => item.id === teacherId);
+
+  if (!teacher) {
+    return {
+      title: "Teacher Not Found",
+      description: "The requested teacher could not be found.",
+    };
+  }
+
+  return {
+    title: teacher.name,
+    description: `Learn from ${teacher.name} through Islamic courses and live classes on IlmHub.`,
+  };
+}
 
 export default async function TeacherProfilePage({
   params,
@@ -46,6 +75,7 @@ export default async function TeacherProfilePage({
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
         {/* Pattern */}
@@ -514,6 +544,7 @@ export default async function TeacherProfilePage({
           </Link>
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

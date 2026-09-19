@@ -1,6 +1,15 @@
 import HadithHero from "@/app/components/hadith/HadithHero";
 import HadithSearch from "@/app/components/hadith/HadithSearch";
 import HadithCollectionCard from "@/app/components/hadith/HadithCollectionCard";
+import type { Metadata } from "next";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+
+export const metadata: Metadata = {
+  title: "Hadith",
+  description:
+    "Explore authentic Hadith collections and study the teachings and traditions of the Prophet ﷺ.",
+};
 
 const collections = [
   {
@@ -50,6 +59,7 @@ const collections = [
 export default function HadithPage() {
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       <HadithHero />
 
       <HadithSearch />
@@ -83,6 +93,7 @@ export default function HadithPage() {
           ))}
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

@@ -2,12 +2,35 @@ import BooksSearch from "@/app/components/hadith/BookSearch";
 
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type CollectionPageProps = {
   params: Promise<{
     collection: string;
   }>;
 };
+type Props = {
+  params: Promise<{
+    collection: string;
+  }>;
+};
+
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { collection } = await params;
+
+  const collectionName = collection
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return {
+    title: `${collectionName} Hadith`,
+    description: `Explore and study Hadith from the ${collectionName} collection on IlmHub.`,
+  };
+}
 
 type Book = {
   number: number;
@@ -158,6 +181,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* =====================================================
           HERO
       ===================================================== */}
@@ -186,7 +210,15 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
         />
 
         <div className="relative mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8 lg:py-20">
+            <Link
+              href="/hadith"
+              className="text-stone-400 transition-colors mb-12 hover:text-[#d6b56d]"
+            >
+              
+             Back to Hadith
+            </Link>
           <div className="max-w-3xl">
+             
             {/* Label */}
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d6b56d]/25 bg-[#d6b56d]/10">
@@ -247,6 +279,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           )}
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

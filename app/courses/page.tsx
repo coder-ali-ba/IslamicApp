@@ -9,6 +9,8 @@ import {
   type CourseCategory,
   type CourseLevel,
 } from "@/app/src/lib/course";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function CoursesPage() {
   const [search, setSearch] = useState("");
@@ -58,6 +60,7 @@ export default function CoursesPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <CoursesHero
         search={search}
@@ -179,6 +182,7 @@ export default function CoursesPage() {
           )}
         </div>
       </section>
+      <Footer />
     </main>
   );
 }

@@ -7,6 +7,8 @@ import QuranSearch from "@/app/components/quran/QuranSearch";
 import SurahCard from "@/app/components/quran/SurahCard";
 
 import { surahs } from "../src/lib/surah";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 export default function QuranPage() {
   const [query, setQuery] = useState("");
@@ -29,6 +31,7 @@ export default function QuranPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       <QuranHero />
 
       <section className="mx-auto max-w-7xl px-6 py-10">
@@ -82,6 +85,7 @@ export default function QuranPage() {
           Quran data provided by Quran Foundation
         </p>
       </section>
+      <Footer/>
     </main>
   );
 }

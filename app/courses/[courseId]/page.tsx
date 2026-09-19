@@ -12,12 +12,41 @@ import {
 
 import { courses } from "@/app/src/lib/course";
 import { courseDetails } from "@/app/src/lib/course-detail";
+import type { Metadata } from "next";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
 
 type CourseDetailsPageProps = {
   params: Promise<{
     courseId: string;
   }>;
 };
+
+type Props = {
+  params: Promise<{
+    courseId: string;
+  }>;
+};
+
+export async function generateMetadata({
+  params,
+}: Props): Promise<Metadata> {
+  const { courseId } = await params;
+
+  const course = courses.find((item) => item.id === courseId);
+
+  if (!course) {
+    return {
+      title: "Course Not Found",
+      description: "The requested Islamic course could not be found.",
+    };
+  }
+
+  return {
+    title: course.title,
+    description: course.description,
+  };
+}
 
 export default async function CourseDetailsPage({
   params,
@@ -38,6 +67,7 @@ export default async function CourseDetailsPage({
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
+      <Navbar />
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
         {/* Background Decoration */}
@@ -393,6 +423,7 @@ export default async function CourseDetailsPage({
           </aside>
         </div>
       </section>
+      <Footer />
     </main>
   );
 }
