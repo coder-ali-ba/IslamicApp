@@ -11,19 +11,27 @@ export type CourseLevel =
   | "Intermediate"
   | "Advanced";
 
+export type CourseInstructor = {
+  _id: string;
+  name: string;
+  email: string;
+  role: "student" | "teacher" | "scholar" | "admin";
+};
+
 export type Course = {
   id: string;
   title: string;
   description: string;
   category: CourseCategory;
   level: CourseLevel;
-  instructor: string;
+  instructor: CourseInstructor;
   duration: string;
   lessons: number;
   students: number;
   price: number;
   image: string;
   featured: boolean;
+  status?: "Draft" | "Published";
 };
 
 export const courses: Course[] = [

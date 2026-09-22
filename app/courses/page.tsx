@@ -1,92 +1,120 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
+
 import CoursesHero from "@/app/components/courses/CoursesHero";
-import CourseCard from "@/app/components/courses/CourseCard";
 import CourseFilters from "@/app/components/courses/CourseFilters";
+import CourseCard from "@/app/components/courses/CourseCard";
+
 import {
-  courses,
+  type Course,
   type CourseCategory,
   type CourseLevel,
 } from "@/app/src/lib/course";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
 
 export default function CoursesPage() {
+  const [courses, setCourses] = useState<Course[]>([]);
+
   const [search, setSearch] = useState("");
-  const [category, setCategory] =
-    useState<CourseCategory | "All">("All");
-  const [level, setLevel] =
-    useState<CourseLevel | "All">("All");
+  const [category, setCategory] = useState<CourseCategory | "All">("All");
+  const [level, setLevel] = useState<CourseLevel | "All">("All");
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Fetch courses from backend
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/courses`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to fetch courses");
+        }
+
+        const formattedCourses: Course[] = (data.courses || []).map(
+          (course: any) => ({
+            id: course._id,
+            title: course.title,
+            description: course.description,
+            category: course.category,
+            level: course.level,
+            instructor:
+              course.instructor?.name || "Unknown Instructor",
+            duration: course.duration,
+            lessons: course.lessons,
+            students: course.students,
+            price: course.price,
+            image: course.image,
+            featured: course.featured,
+          })
+        );
+
+        setCourses(formattedCourses);
+      } catch (error) {
+        console.error("Fetch Courses Error:", error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load courses"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
+  // Search + filters
   const filteredCourses = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-
     return courses.filter((course) => {
       const matchesSearch =
-        !query ||
         course.title
-          .toLocaleLowerCase()
-          .includes(query) ||
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
         course.description
-          .toLocaleLowerCase()
-          .includes(query) ||
-        course.category
-          .toLocaleLowerCase()
-          .includes(query) ||
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
         course.instructor
-          .toLocaleLowerCase()
-          .includes(query);
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
       const matchesCategory =
-        category === "All" ||
-        course.category === category;
+        category === "All" || course.category === category;
 
       const matchesLevel =
-        level === "All" ||
-        course.level === level;
+        level === "All" || course.level === level;
 
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesLevel
-      );
+      return matchesSearch && matchesCategory && matchesLevel;
     });
-  }, [search, category, level]);
+  }, [courses, search, category, level]);
 
   const featuredCourses = filteredCourses.filter(
     (course) => course.featured
   );
 
   return (
-    <main className="min-h-screen bg-[#faf9f6]">
+    <div className="min-h-screen bg-[#faf9f6] text-stone-900">
       <Navbar />
-      {/* Hero */}
+
       <CoursesHero
         search={search}
         onSearchChange={setSearch}
       />
 
-      {/* Courses */}
-      <section className="mx-auto max-w-7xl px-5 py-12 md:px-8 md:py-16">
-        {/* Intro */}
-        <div className="mb-8">
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#967438]">
-            Explore Learning
-          </p>
-
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 md:text-4xl">
-            Find a course that suits you
-          </h2>
-
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-500 md:text-base">
-            Choose from structured Islamic courses designed
-            for beginners, intermediate learners and advanced
-            students.
-          </p>
-        </div>
-
-        {/* Filters */}
+      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <CourseFilters
           category={category}
           level={level}
@@ -94,96 +122,110 @@ export default function CoursesPage() {
           onLevelChange={setLevel}
         />
 
-        {/* Featured */}
-        {featuredCourses.length > 0 &&
-          !search &&
-          category === "All" &&
-          level === "All" && (
-            <div className="mb-14">
-              <div className="mb-6 flex items-end justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                    Recommended
-                  </p>
+        {/* Loading */}
+        {loading && (
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div
+                key={item}
+                className="animate-pulse overflow-hidden rounded-2xl border border-stone-200 bg-white"
+              >
+                <div className="h-52 bg-stone-200" />
 
-                  <h3 className="mt-1 text-2xl font-semibold text-stone-900">
-                    Featured Courses
-                  </h3>
+                <div className="space-y-4 p-5">
+                  <div className="h-4 w-24 rounded bg-stone-200" />
+                  <div className="h-6 w-3/4 rounded bg-stone-200" />
+                  <div className="h-4 w-full rounded bg-stone-200" />
+                  <div className="h-4 w-5/6 rounded bg-stone-200" />
                 </div>
               </div>
-
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {featuredCourses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-        {/* All Courses */}
-        <div>
-          <div className="mb-6 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-                Browse
-              </p>
-
-              <h3 className="mt-1 text-2xl font-semibold text-stone-900">
-                {search ||
-                category !== "All" ||
-                level !== "All"
-                  ? "Search Results"
-                  : "All Courses"}
-              </h3>
-            </div>
-
-            <p className="text-sm text-stone-500">
-              {filteredCourses.length} course
-              {filteredCourses.length !== 1
-                ? "s"
-                : ""}
-            </p>
+            ))}
           </div>
+        )}
 
-          {filteredCourses.length === 0 ? (
-            <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-lg font-medium text-stone-800">
-                No courses found
-              </p>
+        {/* Error */}
+        {!loading && error && (
+          <div className="mt-10 rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+            <h2 className="text-lg font-semibold text-red-800">
+              Unable to load courses
+            </h2>
 
-              <p className="mt-2 text-sm text-stone-500">
-                Try changing your search or filters.
-              </p>
+            <p className="mt-2 text-sm text-red-600">
+              {error}
+            </p>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setCategory("All");
-                  setLevel("All");
-                }}
-                className="mt-5 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
-              >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredCourses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Courses */}
+        {!loading && !error && (
+          <>
+            {featuredCourses.length > 0 && (
+              <section>
+                <div className="mb-6">
+                  <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#967438]">
+                    Featured Learning
+                  </p>
+
+                  <h2 className="mt-2 text-2xl font-semibold text-stone-900 sm:text-3xl">
+                    Featured Courses
+                  </h2>
+                </div>
+
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {featuredCourses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className={featuredCourses.length > 0 ? "mt-16" : ""}>
+              <div className="mb-6">
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#967438]">
+                  Explore IlmHub
+                </p>
+
+                <h2 className="mt-2 text-2xl font-semibold text-stone-900 sm:text-3xl">
+                  All Courses
+                </h2>
+              </div>
+
+              {filteredCourses.length === 0 ? (
+                <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center">
+                  <h3 className="text-xl font-semibold text-stone-900">
+                    No courses found
+                  </h3>
+
+                  <p className="mt-2 text-sm text-stone-500">
+                    Try changing your search or filters.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredCourses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </main>
+
       <Footer />
-    </main>
+    </div>
   );
 }
-

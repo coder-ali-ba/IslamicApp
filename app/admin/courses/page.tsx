@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -11,87 +11,83 @@ import {
   Clock3,
   Star,
   SlidersHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
-const courses = [
-  {
-    id: "learn-quran-reading",
-    title: "Learn Quran Reading",
-    category: "Quran",
-    level: "Beginner",
-    instructor: "Ustadh Muhammad Ahmed",
-    students: 320,
-    lessons: 24,
-    duration: "8 Weeks",
-    rating: 4.9,
-    status: "Published",
-  },
-  {
-    id: "quran-with-tajweed",
-    title: "Quran with Tajweed",
-    category: "Quran",
-    level: "Intermediate",
-    instructor: "Ustadh Abdul Rahman",
-    students: 285,
-    lessons: 32,
-    duration: "10 Weeks",
-    rating: 4.8,
-    status: "Published",
-  },
-  {
-    id: "understanding-hadith",
-    title: "Understanding Hadith",
-    category: "Hadith",
-    level: "Intermediate",
-    instructor: "Dr. Ibrahim Khan",
-    students: 190,
-    lessons: 28,
-    duration: "8 Weeks",
-    rating: 4.7,
-    status: "Published",
-  },
-  {
-    id: "arabic-language-basics",
-    title: "Arabic Language Basics",
-    category: "Arabic",
-    level: "Beginner",
-    instructor: "Ustadh Omar Farooq",
-    students: 156,
-    lessons: 30,
-    duration: "12 Weeks",
-    rating: 4.8,
-    status: "Draft",
-  },
-  {
-    id: "essential-fiqh",
-    title: "Essential Fiqh for Muslims",
-    category: "Fiqh",
-    level: "Beginner",
-    instructor: "Mufti Abdullah",
-    students: 240,
-    lessons: 20,
-    duration: "6 Weeks",
-    rating: 4.9,
-    status: "Published",
-  },
-  {
-    id: "life-of-prophet",
-    title: "Life of the Prophet ﷺ",
-    category: "Seerah",
-    level: "Intermediate",
-    instructor: "Dr. Hamza Malik",
-    students: 210,
-    lessons: 26,
-    duration: "8 Weeks",
-    rating: 4.8,
-    status: "Published",
-  },
-];
+type AdminCourse = {
+  id: string;
+  title: string;
+  category: string;
+  level: string;
+  instructor: string;
+  students: number;
+  lessons: number;
+  duration: string;
+  price: number;
+  status: "Published" | "Draft";
+};
 
 export default function AdminCoursesPage() {
+  const [courses, setCourses] = useState<AdminCourse[]>([]);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [level, setLevel] = useState("All");
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Fetch all courses for admin
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/courses/admin`,
+          {
+            credentials: "include",
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to fetch courses");
+        }
+
+        const formattedCourses: AdminCourse[] = (data.courses || []).map(
+          (course: any) => ({
+            id: course._id,
+            title: course.title,
+            category: course.category,
+            level: course.level,
+            instructor: course.instructor?.name || "No Instructor",
+            students: course.students ?? 0,
+            lessons: course.lessons ?? 0,
+            duration: course.duration || "N/A",
+            price: course.price ?? 0,
+            status: course.status,
+          }),
+        );
+
+        setCourses(formattedCourses);
+      } catch (error) {
+        console.error("Fetch Admin Courses Error:", error);
+
+        setError(
+          error instanceof Error ? error.message : "Failed to load courses",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => {
@@ -106,20 +102,53 @@ export default function AdminCoursesPage() {
 
       return matchesSearch && matchesCategory && matchesLevel;
     });
-  }, [search, category, level]);
+  }, [courses, search, category, level]);
 
   const publishedCount = courses.filter(
-    (course) => course.status === "Published"
-  ).length;
-
-  const draftCount = courses.filter(
-    (course) => course.status === "Draft"
+    (course) => course.status === "Published",
   ).length;
 
   const totalStudents = courses.reduce(
     (total, course) => total + course.students,
-    0
+    0,
   );
+
+  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${courseTitle}"?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(courseId);
+      setError("");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete course");
+      }
+
+      setCourses((prev) => prev.filter((course) => course.id !== courseId));
+    } catch (error) {
+      console.error("Delete Course Error:", error);
+
+      setError(
+        error instanceof Error ? error.message : "Failed to delete course",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -158,7 +187,7 @@ export default function AdminCoursesPage() {
           </div>
 
           <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {courses.length}
+            {loading ? "—" : courses.length}
           </p>
         </div>
 
@@ -172,7 +201,7 @@ export default function AdminCoursesPage() {
           </div>
 
           <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {publishedCount}
+            {loading ? "—" : publishedCount}
           </p>
         </div>
 
@@ -186,7 +215,7 @@ export default function AdminCoursesPage() {
           </div>
 
           <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {totalStudents.toLocaleString()}
+            {loading ? "—" : totalStudents.toLocaleString()}
           </p>
         </div>
       </div>
@@ -222,6 +251,7 @@ export default function AdminCoursesPage() {
               <option value="Arabic">Arabic</option>
               <option value="Fiqh">Fiqh</option>
               <option value="Seerah">Seerah</option>
+              <option value="Islamic Studies">Islamic Studies</option>
             </select>
           </div>
 
@@ -239,91 +269,256 @@ export default function AdminCoursesPage() {
         </div>
       </div>
 
-      {/* Desktop Table */}
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <div className="hidden overflow-x-auto lg:block">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/70">
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Course
-                </th>
+      {/* Error */}
+      {!loading && error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+          <p className="font-medium text-red-800">Failed to load courses</p>
 
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Category
-                </th>
+          <p className="mt-1 text-sm text-red-600">{error}</p>
 
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Instructor
-                </th>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
 
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Students
-                </th>
+      {/* Loading */}
+      {loading && (
+        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full">
+              <tbody>
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <tr
+                    key={item}
+                    className="animate-pulse border-b border-stone-100"
+                  >
+                    <td className="px-6 py-6">
+                      <div className="h-5 w-64 rounded bg-stone-200" />
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="h-5 w-20 rounded bg-stone-200" />
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="h-5 w-32 rounded bg-stone-200" />
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="h-5 w-16 rounded bg-stone-200" />
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="h-6 w-20 rounded-full bg-stone-200" />
+                    </td>
+                    <td />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Status
-                </th>
+          <div className="divide-y divide-stone-100 lg:hidden">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="animate-pulse p-5">
+                <div className="h-5 w-2/3 rounded bg-stone-200" />
+                <div className="mt-3 h-4 w-1/3 rounded bg-stone-200" />
+                <div className="mt-4 h-5 w-1/2 rounded bg-stone-200" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Action
-                </th>
-              </tr>
-            </thead>
+      {/* Courses */}
+      {!loading && !error && (
+        <>
+          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+            {/* Desktop Table */}
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-stone-100 bg-stone-50/70">
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Course
+                    </th>
 
-            <tbody className="divide-y divide-stone-100">
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Category
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Instructor
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Students
+                    </th>
+
+                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Status
+                    </th>
+
+                    <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-stone-100">
+                  {filteredCourses.map((course) => (
+                    <tr
+                      key={course.id}
+                      className="transition hover:bg-stone-50/60"
+                    >
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-medium text-stone-900">
+                              {course.title}
+                            </p>
+
+                            <div className="mt-1 flex items-center gap-3 text-xs text-stone-400">
+                              <span className="flex items-center gap-1">
+                                <Clock3 className="h-3.5 w-3.5" />
+                                {course.duration}
+                              </span>
+
+                              <span>{course.lessons} lessons</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-5">
+                        <div>
+                          <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
+                            {course.category}
+                          </span>
+
+                          <p className="mt-2 text-xs text-stone-400">
+                            {course.level}
+                          </p>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-5 text-sm text-stone-600">
+                        {course.instructor}
+                      </td>
+
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-1.5 text-sm text-stone-700">
+                          <Users className="h-4 w-4 text-stone-400" />
+                          {course.students}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-5">
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                            course.status === "Published"
+                              ? "bg-stone-900 text-white"
+                              : "bg-stone-100 text-stone-500"
+                          }`}
+                        >
+                          {course.status}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/admin/courses/${course.id}/edit`}
+                            aria-label={`Edit ${course.title}`}
+                            className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+
+                          <button
+                            type="button"
+                            aria-label={`Delete ${course.title}`}
+                            onClick={() =>
+                              handleDeleteCourse(course.id, course.title)
+                            }
+                            disabled={deletingId === course.id}
+                            className="rounded-lg p-2 text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {deletingId === course.id ? (
+                              <span className="block h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-red-500" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile */}
+            <div className="divide-y divide-stone-100 lg:hidden">
               {filteredCourses.map((course) => (
-                <tr
-                  key={course.id}
-                  className="transition hover:bg-stone-50/60"
-                >
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
+                <div key={course.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
                         <BookOpen className="h-5 w-5" />
                       </div>
 
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-stone-900">
                           {course.title}
                         </p>
 
-                        <div className="mt-1 flex items-center gap-3 text-xs text-stone-400">
-                          <span className="flex items-center gap-1">
-                            <Clock3 className="h-3.5 w-3.5" />
-                            {course.duration}
-                          </span>
-
-                          <span>{course.lessons} lessons</span>
-                        </div>
+                        <p className="mt-1 truncate text-xs text-stone-500">
+                          {course.instructor}
+                        </p>
                       </div>
                     </div>
-                  </td>
 
-                  <td className="px-6 py-5">
-                    <div>
-                      <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                        {course.category}
-                      </span>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/admin/courses/${course.id}/edit`}
+                        aria-label={`Edit ${course.title}`}
+                        className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
 
-                      <p className="mt-2 text-xs text-stone-400">
-                        {course.level}
-                      </p>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${course.title}`}
+                        onClick={() =>
+                          handleDeleteCourse(course.id, course.title)
+                        }
+                        disabled={deletingId === course.id}
+                        className="rounded-lg p-2 text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingId === course.id ? (
+                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-red-500" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
-                  </td>
+                  </div>
 
-                  <td className="px-6 py-5 text-sm text-stone-600">
-                    {course.instructor}
-                  </td>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
+                      {course.category}
+                    </span>
 
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-1.5 text-sm text-stone-700">
-                      <Users className="h-4 w-4 text-stone-400" />
-                      {course.students}
-                    </div>
-                  </td>
+                    <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs text-stone-500">
+                      {course.level}
+                    </span>
 
-                  <td className="px-6 py-5">
                     <span
                       className={`rounded-full px-3 py-1.5 text-xs font-medium ${
                         course.status === "Published"
@@ -333,95 +528,34 @@ export default function AdminCoursesPage() {
                     >
                       {course.status}
                     </span>
-                  </td>
-
-                  <td className="px-6 py-5 text-right">
-                    <button
-                      aria-label={`Actions for ${course.title}`}
-                      className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
-                    >
-                      <MoreHorizontal className="h-5 w-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile */}
-        <div className="divide-y divide-stone-100 lg:hidden">
-          {filteredCourses.map((course) => (
-            <div key={course.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-                    <BookOpen className="h-5 w-5" />
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-stone-900">
-                      {course.title}
-                    </p>
+                  <div className="mt-4 flex items-center justify-between text-xs text-stone-400">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" />
+                      {course.students} students
+                    </span>
 
-                    <p className="mt-1 truncate text-xs text-stone-500">
-                      {course.instructor}
-                    </p>
+                    <span>{course.lessons} lessons</span>
+
+                    <span>Rs. {course.price.toLocaleString()}</span>
                   </div>
                 </div>
+              ))}
 
-                <button
-                  aria-label={`Actions for ${course.title}`}
-                  className="rounded-lg p-2 text-stone-400 hover:bg-stone-100"
-                >
-                  <MoreHorizontal className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                  {course.category}
-                </span>
-
-                <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs text-stone-500">
-                  {course.level}
-                </span>
-
-                <span
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                    course.status === "Published"
-                      ? "bg-stone-900 text-white"
-                      : "bg-stone-100 text-stone-500"
-                  }`}
-                >
-                  {course.status}
-                </span>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between text-xs text-stone-400">
-                <span className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  {course.students} students
-                </span>
-
-                <span>{course.lessons} lessons</span>
-
-                <span>{course.rating} ★</span>
-              </div>
+              {filteredCourses.length === 0 && (
+                <div className="px-6 py-12 text-center text-sm text-stone-500">
+                  No courses found.
+                </div>
+              )}
             </div>
-          ))}
+          </div>
 
-          {filteredCourses.length === 0 && (
-            <div className="px-6 py-12 text-center text-sm text-stone-500">
-              No courses found.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <p className="text-xs text-stone-400">
-        Showing {filteredCourses.length} of {courses.length} courses
-      </p>
+          <p className="text-xs text-stone-400">
+            Showing {filteredCourses.length} of {courses.length} courses
+          </p>
+        </>
+      )}
     </div>
   );
 }

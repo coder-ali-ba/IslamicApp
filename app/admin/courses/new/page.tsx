@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   BookOpen,
   Check,
   Image as ImageIcon,
+  Loader2,
   Save,
 } from "lucide-react";
 
@@ -21,20 +23,180 @@ const categories = [
 
 const levels = ["Beginner", "Intermediate", "Advanced"];
 
-export default function NewCoursePage() {
-  const [featured, setFeatured] = useState(false);
-  const [status, setStatus] = useState<"Draft" | "Published">("Draft");
+type CourseStatus = "Draft" | "Published";
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+type Teacher = {
+  _id: string;
+  name: string;
+  email: string;
+  role: "teacher" | "scholar";
+};
+
+export default function NewCoursePage() {
+  const router = useRouter();
+
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teachersLoading, setTeachersLoading] = useState(true);
+
+  const [featured, setFeatured] = useState(false);
+  const [status, setStatus] = useState<CourseStatus>("Draft");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        setTeachersLoading(true);
+
+        const response = await fetch(`${API_URL}/auth/teachers`, {
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to load instructors");
+        }
+
+        setTeachers(data.teachers || []);
+      } catch (error) {
+        console.error("Fetch Teachers Error:", error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load instructors"
+        );
+      } finally {
+        setTeachersLoading(false);
+      }
+    };
+
+    fetchTeachers();
+  }, [API_URL]);
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
-    // Backend/API will be connected later
-    console.log("Course form submitted");
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+
+    try {
+      const form = e.currentTarget;
+      const formData = new FormData(form);
+
+      const title = String(formData.get("title") || "").trim();
+      const description = String(
+        formData.get("description") || ""
+      ).trim();
+
+      const category = String(formData.get("category") || "");
+      const level = String(formData.get("level") || "");
+      const instructor = String(
+        formData.get("instructor") || ""
+      );
+
+      const duration = String(
+        formData.get("duration") || ""
+      ).trim();
+
+      const lessons = Number(formData.get("lessons") || 0);
+      const price = Number(formData.get("price") || 0);
+
+      const image = String(
+        formData.get("image") || ""
+      ).trim();
+
+      if (!title || !description) {
+        throw new Error(
+          "Please enter the course title and description."
+        );
+      }
+
+      if (!category || !level) {
+        throw new Error(
+          "Please select a category and level."
+        );
+      }
+
+      if (!instructor) {
+        throw new Error(
+          "Please select an instructor."
+        );
+      }
+
+      if (!duration) {
+        throw new Error("Please enter the course duration.");
+      }
+
+      if (!lessons || lessons < 1) {
+        throw new Error(
+          "Number of lessons must be at least 1."
+        );
+      }
+
+      if (price < 0) {
+        throw new Error("Price cannot be negative.");
+      }
+
+      const response = await fetch(`${API_URL}/courses`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          level,
+          instructor,
+          duration,
+          lessons,
+          price,
+          image,
+          featured,
+          status,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to create course"
+        );
+      }
+
+      setSuccess("Course created successfully.");
+
+      setTimeout(() => {
+        router.push("/admin/courses");
+      }, 800);
+    } catch (error) {
+      console.error("Create Course Error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while creating the course."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="min-h-screen bg-[#faf9f6] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
+
         {/* Header */}
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -55,6 +217,7 @@ export default function NewCoursePage() {
                 <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
                   Create Course
                 </h1>
+
                 <p className="mt-1 text-sm text-stone-500">
                   Add a new Islamic course to IlmHub.
                 </p>
@@ -73,31 +236,53 @@ export default function NewCoursePage() {
             <button
               form="course-form"
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Save className="h-4 w-4" />
-              Save Course
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+
+              {submitting ? "Saving..." : "Save Course"}
             </button>
           </div>
         </div>
+
+        {/* Messages */}
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {success}
+          </div>
+        )}
 
         <form
           id="course-form"
           onSubmit={handleSubmit}
           className="space-y-6"
         >
+
           {/* Basic Information */}
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-stone-900">
                 Basic Information
               </h2>
+
               <p className="mt-1 text-sm text-stone-500">
                 Enter the main information about this course.
               </p>
             </div>
 
             <div className="space-y-5">
+
               {/* Title */}
               <div>
                 <label
@@ -138,6 +323,7 @@ export default function NewCoursePage() {
 
               {/* Category + Level */}
               <div className="grid gap-5 sm:grid-cols-2">
+
                 <div>
                   <label
                     htmlFor="category"
@@ -158,7 +344,10 @@ export default function NewCoursePage() {
                     </option>
 
                     {categories.map((category) => (
-                      <option key={category} value={category}>
+                      <option
+                        key={category}
+                        value={category}
+                      >
                         {category}
                       </option>
                     ))}
@@ -185,12 +374,16 @@ export default function NewCoursePage() {
                     </option>
 
                     {levels.map((level) => (
-                      <option key={level} value={level}>
+                      <option
+                        key={level}
+                        value={level}
+                      >
                         {level}
                       </option>
                     ))}
                   </select>
                 </div>
+
               </div>
             </div>
           </section>
@@ -201,12 +394,14 @@ export default function NewCoursePage() {
               <h2 className="text-lg font-semibold text-stone-900">
                 Course Details
               </h2>
+
               <p className="mt-1 text-sm text-stone-500">
                 Add instructor, duration, lessons and pricing information.
               </p>
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
+
               {/* Instructor */}
               <div>
                 <label
@@ -216,14 +411,38 @@ export default function NewCoursePage() {
                   Instructor
                 </label>
 
-                <input
+                <select
                   id="instructor"
                   name="instructor"
-                  type="text"
                   required
-                  placeholder="e.g. Ustadh Muhammad Ahmed"
-                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
-                />
+                  defaultValue=""
+                  disabled={teachersLoading}
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
+                >
+                  <option value="" disabled>
+                    {teachersLoading
+                      ? "Loading instructors..."
+                      : teachers.length === 0
+                      ? "No instructors found"
+                      : "Select instructor"}
+                  </option>
+
+                  {teachers.map((teacher) => (
+                    <option
+                      key={teacher._id}
+                      value={teacher._id}
+                    >
+                      {teacher.name} ({teacher.role})
+                    </option>
+                  ))}
+                </select>
+
+                {!teachersLoading &&
+                  teachers.length === 0 && (
+                    <p className="mt-2 text-xs text-amber-600">
+                      No active teacher or scholar accounts found.
+                    </p>
+                  )}
               </div>
 
               {/* Duration */}
@@ -286,6 +505,7 @@ export default function NewCoursePage() {
                     min="0"
                     required
                     placeholder="0"
+                    defaultValue="0"
                     className="w-full rounded-xl border border-stone-300 bg-white py-3 pl-9 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                   />
                 </div>
@@ -294,6 +514,7 @@ export default function NewCoursePage() {
                   Use 0 for a free course.
                 </p>
               </div>
+
             </div>
           </section>
 
@@ -303,12 +524,14 @@ export default function NewCoursePage() {
               <h2 className="text-lg font-semibold text-stone-900">
                 Course Image
               </h2>
+
               <p className="mt-1 text-sm text-stone-500">
                 Add an image URL for the course thumbnail.
               </p>
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row">
+
               <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-400">
                 <ImageIcon className="h-8 w-8" />
               </div>
@@ -333,6 +556,7 @@ export default function NewCoursePage() {
                   Cloudinary upload will be connected later.
                 </p>
               </div>
+
             </div>
           </section>
 
@@ -342,12 +566,14 @@ export default function NewCoursePage() {
               <h2 className="text-lg font-semibold text-stone-900">
                 Publishing
               </h2>
+
               <p className="mt-1 text-sm text-stone-500">
                 Control the visibility of this course.
               </p>
             </div>
 
             <div className="space-y-5">
+
               {/* Status */}
               <div>
                 <p className="mb-3 text-sm font-medium text-stone-800">
@@ -355,36 +581,38 @@ export default function NewCoursePage() {
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {(["Draft", "Published"] as const).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setStatus(item)}
-                      className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
-                        status === item
-                          ? "border-[#d6b56d] bg-[#d6b56d]/10"
-                          : "border-stone-200 bg-white hover:border-stone-300"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-stone-900">
-                          {item}
-                        </p>
+                  {(["Draft", "Published"] as CourseStatus[]).map(
+                    (item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setStatus(item)}
+                        className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
+                          status === item
+                            ? "border-[#d6b56d] bg-[#d6b56d]/10"
+                            : "border-stone-200 bg-white hover:border-stone-300"
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-stone-900">
+                            {item}
+                          </p>
 
-                        <p className="mt-1 text-xs text-stone-500">
-                          {item === "Draft"
-                            ? "Keep the course hidden for now."
-                            : "Make the course visible to students."}
-                        </p>
-                      </div>
-
-                      {status === item && (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
-                          <Check className="h-4 w-4" />
+                          <p className="mt-1 text-xs text-stone-500">
+                            {item === "Draft"
+                              ? "Keep the course hidden for now."
+                              : "Make the course visible to students."}
+                          </p>
                         </div>
-                      )}
-                    </button>
-                  ))}
+
+                        {status === item && (
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
+                            <Check className="h-4 w-4" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -405,7 +633,9 @@ export default function NewCoursePage() {
                   onClick={() => setFeatured(!featured)}
                   aria-pressed={featured}
                   className={`relative h-6 w-11 rounded-full transition ${
-                    featured ? "bg-stone-900" : "bg-stone-300"
+                    featured
+                      ? "bg-stone-900"
+                      : "bg-stone-300"
                   }`}
                 >
                   <span
@@ -415,6 +645,7 @@ export default function NewCoursePage() {
                   />
                 </button>
               </div>
+
             </div>
           </section>
 
@@ -429,12 +660,19 @@ export default function NewCoursePage() {
 
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Save className="h-4 w-4" />
-              Save Course
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+
+              {submitting ? "Saving..." : "Save Course"}
             </button>
           </div>
+
         </form>
       </div>
     </main>

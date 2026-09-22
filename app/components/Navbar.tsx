@@ -8,7 +8,10 @@ import {
   BookOpen,
   Search,
   ChevronDown,
+  LogOut,
 } from "lucide-react";
+
+import { useAuth } from "../context/AuthContext";
 
 const navLinks = [
   { name: "About", href: "/about" },
@@ -23,11 +26,23 @@ const navLinks = [
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const { user, loading, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true);
+      await logout();
+      setIsOpen(false);
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#faf9f6]/95 backdrop-blur-md">
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
-
         {/* Logo */}
         <Link href="/" className="group flex items-center gap-2.5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d6b56d] text-stone-950 transition duration-300 group-hover:bg-[#c9a75f]">
@@ -62,7 +77,6 @@ export default function Navbar() {
 
         {/* Desktop Actions */}
         <div className="hidden items-center gap-2.5 lg:flex">
-
           {/* Search */}
           <Link
             href="/search"
@@ -72,21 +86,35 @@ export default function Navbar() {
             <Search size={18} strokeWidth={1.8} />
           </Link>
 
-          {/* Login */}
-          <Link
-            href="/login"
-            className="rounded-lg border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-700 transition duration-200 hover:border-stone-500 hover:bg-stone-50 hover:text-stone-950"
-          >
-            Login
-          </Link>
+          {/* Auth Actions */}
+          {!loading &&
+            (user ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="inline-flex items-center gap-2 rounded-lg border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-700 transition duration-200 hover:border-stone-500 hover:bg-stone-50 hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <LogOut size={15} strokeWidth={1.8} />
+                {loggingOut ? "Logging out..." : "Logout"}
+              </button>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-lg border border-stone-300 px-4 py-2 text-[13px] font-medium text-stone-700 transition duration-200 hover:border-stone-500 hover:bg-stone-50 hover:text-stone-950"
+                >
+                  Login
+                </Link>
 
-          {/* Get Started */}
-          <Link
-            href="/register"
-            className="rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition duration-200 hover:bg-stone-800"
-          >
-            Get Started
-          </Link>
+                <Link
+                  href="/register"
+                  className="rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition duration-200 hover:bg-stone-800"
+                >
+                  Get Started
+                </Link>
+              </>
+            ))}
         </div>
 
         {/* Mobile Menu Button */}
@@ -107,7 +135,6 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {isOpen && (
         <div className="border-t border-stone-200 bg-[#faf9f6] px-5 py-5 lg:hidden">
-          
           <nav className="flex flex-col">
             {navLinks.map((link) => (
               <Link
@@ -126,23 +153,39 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Mobile Actions */}
-          <div className="mt-5 flex gap-3 border-t border-stone-200 pt-5">
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
-              className="flex-1 rounded-lg border border-stone-300 py-2.5 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-            >
-              Login
-            </Link>
+          {/* Mobile Auth Actions */}
+          <div className="mt-5 border-t border-stone-200 pt-5">
+            {!loading &&
+              (user ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-300 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <LogOut size={16} />
 
-            <Link
-              href="/register"
-              onClick={() => setIsOpen(false)}
-              className="flex-1 rounded-lg bg-stone-900 py-2.5 text-center text-sm font-medium text-white transition hover:bg-stone-800"
-            >
-              Get Started
-            </Link>
+                  {loggingOut ? "Logging out..." : "Logout"}
+                </button>
+              ) : (
+                <div className="flex gap-3">
+                  <Link
+                    href="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1 rounded-lg border border-stone-300 py-2.5 text-center text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+                  >
+                    Login
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1 rounded-lg bg-stone-900 py-2.5 text-center text-sm font-medium text-white transition hover:bg-stone-800"
+                  >
+                    Get Started
+                  </Link>
+                </div>
+              ))}
           </div>
 
           {/* Mobile Search */}
@@ -159,3 +202,4 @@ export default function Navbar() {
     </header>
   );
 }
+

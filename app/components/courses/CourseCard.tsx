@@ -49,7 +49,7 @@ export default function CourseCard({
 
         {/* Instructor */}
         <p className="mt-5 text-sm font-medium text-stone-700">
-          {course.instructor}
+          {course.instructor.name}
         </p>
 
         {/* Stats */}

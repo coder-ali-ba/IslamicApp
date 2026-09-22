@@ -1,4 +1,5 @@
 "use client";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,6 +19,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
+
 
 const menuItems = [
   {
@@ -77,6 +79,7 @@ export default function AdminLayout({
     )?.label ?? "Dashboard";
 
   return (
+    <ProtectedRoute allowedRoles={["admin"]}>
     <div className="min-h-screen bg-[#faf9f6] text-stone-900">
       {/* Mobile Overlay */}
       {sidebarOpen && (
@@ -233,5 +236,6 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
