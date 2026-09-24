@@ -9,6 +9,7 @@ import {
   Check,
   Image as ImageIcon,
   Loader2,
+  Plus,
   Save,
 } from "lucide-react";
 
@@ -45,6 +46,9 @@ export default function NewCoursePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Stores the newly created course ID
+  const [createdCourseId, setCreatedCourseId] = useState("");
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
@@ -52,14 +56,19 @@ export default function NewCoursePage() {
       try {
         setTeachersLoading(true);
 
-        const response = await fetch(`${API_URL}/auth/teachers`, {
-          credentials: "include",
-        });
+        const response = await fetch(
+          `${API_URL}/auth/teachers`,
+          {
+            credentials: "include",
+          }
+        );
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.message || "Failed to load instructors");
+          throw new Error(
+            data.message || "Failed to load instructors"
+          );
         }
 
         setTeachers(data.teachers || []);
@@ -92,13 +101,22 @@ export default function NewCoursePage() {
       const form = e.currentTarget;
       const formData = new FormData(form);
 
-      const title = String(formData.get("title") || "").trim();
+      const title = String(
+        formData.get("title") || ""
+      ).trim();
+
       const description = String(
         formData.get("description") || ""
       ).trim();
 
-      const category = String(formData.get("category") || "");
-      const level = String(formData.get("level") || "");
+      const category = String(
+        formData.get("category") || ""
+      );
+
+      const level = String(
+        formData.get("level") || ""
+      );
+
       const instructor = String(
         formData.get("instructor") || ""
       );
@@ -107,8 +125,9 @@ export default function NewCoursePage() {
         formData.get("duration") || ""
       ).trim();
 
-      const lessons = Number(formData.get("lessons") || 0);
-      const price = Number(formData.get("price") || 0);
+      const price = Number(
+        formData.get("price") || 0
+      );
 
       const image = String(
         formData.get("image") || ""
@@ -133,39 +152,40 @@ export default function NewCoursePage() {
       }
 
       if (!duration) {
-        throw new Error("Please enter the course duration.");
-      }
-
-      if (!lessons || lessons < 1) {
         throw new Error(
-          "Number of lessons must be at least 1."
+          "Please enter the course duration."
         );
       }
 
       if (price < 0) {
-        throw new Error("Price cannot be negative.");
+        throw new Error(
+          "Price cannot be negative."
+        );
       }
 
-      const response = await fetch(`${API_URL}/courses`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title,
-          description,
-          category,
-          level,
-          instructor,
-          duration,
-          lessons,
-          price,
-          image,
-          featured,
-          status,
-        }),
-      });
+      const response = await fetch(
+        `${API_URL}/courses`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title,
+            description,
+            category,
+            level,
+            instructor,
+            duration,
+            lessons: 0,
+            price,
+            image,
+            featured,
+            status,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -175,13 +195,25 @@ export default function NewCoursePage() {
         );
       }
 
-      setSuccess("Course created successfully.");
+      // Save the newly created course ID
+      const courseId =
+        data.course?._id || data.course?.id;
 
-      setTimeout(() => {
-        router.push("/admin/courses");
-      }, 800);
+      if (!courseId) {
+        throw new Error(
+          "Course was created, but course ID was not returned."
+        );
+      }
+
+      setCreatedCourseId(courseId);
+      setSuccess(
+        "Course created successfully. You can now add lessons."
+      );
     } catch (error) {
-      console.error("Create Course Error:", error);
+      console.error(
+        "Create Course Error:",
+        error
+      );
 
       setError(
         error instanceof Error
@@ -233,36 +265,81 @@ export default function NewCoursePage() {
               Cancel
             </Link>
 
-            <button
-              form="course-form"
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
+            {!createdCourseId && (
+              <button
+                form="course-form"
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
 
-              {submitting ? "Saving..." : "Save Course"}
-            </button>
+                {submitting
+                  ? "Saving..."
+                  : "Save Course"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Messages */}
+        {/* Error */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
+        {/* Success */}
         {success && (
-          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {success}
+          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+                <Check className="h-5 w-5" />
+              </div>
+
+              <div className="flex-1">
+                <p className="font-medium text-green-800">
+                  Course created successfully
+                </p>
+
+                <p className="mt-1 text-sm text-green-700">
+                  Your course has been created. Now you can add lessons to it.
+                </p>
+
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href={`/admin/courses/${createdCourseId}/lessons/new`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Lesson
+                  </Link>
+
+                  <Link
+                    href={`/admin/courses/${createdCourseId}/lessons`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Manage Lessons
+                  </Link>
+
+                  <Link
+                    href="/admin/courses"
+                    className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                  >
+                    View All Courses
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
+        {/* Course Form */}
         <form
           id="course-form"
           onSubmit={handleSubmit}
@@ -297,8 +374,9 @@ export default function NewCoursePage() {
                   name="title"
                   type="text"
                   required
+                  disabled={!!createdCourseId}
                   placeholder="e.g. Quran with Tajweed"
-                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                 />
               </div>
 
@@ -315,9 +393,10 @@ export default function NewCoursePage() {
                   id="description"
                   name="description"
                   required
+                  disabled={!!createdCourseId}
                   rows={5}
                   placeholder="Describe what students will learn in this course..."
-                  className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                  className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                 />
               </div>
 
@@ -336,8 +415,9 @@ export default function NewCoursePage() {
                     id="category"
                     name="category"
                     required
+                    disabled={!!createdCourseId}
                     defaultValue=""
-                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                   >
                     <option value="" disabled>
                       Select category
@@ -366,8 +446,9 @@ export default function NewCoursePage() {
                     id="level"
                     name="level"
                     required
+                    disabled={!!createdCourseId}
                     defaultValue=""
-                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                   >
                     <option value="" disabled>
                       Select level
@@ -396,7 +477,7 @@ export default function NewCoursePage() {
               </h2>
 
               <p className="mt-1 text-sm text-stone-500">
-                Add instructor, duration, lessons and pricing information.
+                Add instructor, duration and pricing information.
               </p>
             </div>
 
@@ -416,15 +497,18 @@ export default function NewCoursePage() {
                   name="instructor"
                   required
                   defaultValue=""
-                  disabled={teachersLoading}
+                  disabled={
+                    teachersLoading ||
+                    !!createdCourseId
+                  }
                   className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                 >
                   <option value="" disabled>
                     {teachersLoading
                       ? "Loading instructors..."
                       : teachers.length === 0
-                      ? "No instructors found"
-                      : "Select instructor"}
+                        ? "No instructors found"
+                        : "Select instructor"}
                   </option>
 
                   {teachers.map((teacher) => (
@@ -459,28 +543,9 @@ export default function NewCoursePage() {
                   name="duration"
                   type="text"
                   required
+                  disabled={!!createdCourseId}
                   placeholder="e.g. 8 weeks"
-                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
-                />
-              </div>
-
-              {/* Lessons */}
-              <div>
-                <label
-                  htmlFor="lessons"
-                  className="mb-2 block text-sm font-medium text-stone-800"
-                >
-                  Number of Lessons
-                </label>
-
-                <input
-                  id="lessons"
-                  name="lessons"
-                  type="number"
-                  min="1"
-                  required
-                  placeholder="e.g. 24"
-                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                 />
               </div>
 
@@ -504,9 +569,10 @@ export default function NewCoursePage() {
                     type="number"
                     min="0"
                     required
+                    disabled={!!createdCourseId}
                     placeholder="0"
                     defaultValue="0"
-                    className="w-full rounded-xl border border-stone-300 bg-white py-3 pl-9 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                    className="w-full rounded-xl border border-stone-300 bg-white py-3 pl-9 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                   />
                 </div>
 
@@ -531,7 +597,6 @@ export default function NewCoursePage() {
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row">
-
               <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-400">
                 <ImageIcon className="h-8 w-8" />
               </div>
@@ -548,15 +613,15 @@ export default function NewCoursePage() {
                   id="image"
                   name="image"
                   type="url"
+                  disabled={!!createdCourseId}
                   placeholder="https://example.com/course-image.jpg"
-                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                 />
 
                 <p className="mt-2 text-xs text-stone-400">
                   Cloudinary upload will be connected later.
                 </p>
               </div>
-
             </div>
           </section>
 
@@ -581,38 +646,41 @@ export default function NewCoursePage() {
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {(["Draft", "Published"] as CourseStatus[]).map(
-                    (item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setStatus(item)}
-                        className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
-                          status === item
-                            ? "border-[#d6b56d] bg-[#d6b56d]/10"
-                            : "border-stone-200 bg-white hover:border-stone-300"
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-stone-900">
-                            {item}
-                          </p>
+                  {(
+                    ["Draft", "Published"] as CourseStatus[]
+                  ).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      disabled={!!createdCourseId}
+                      onClick={() =>
+                        setStatus(item)
+                      }
+                      className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        status === item
+                          ? "border-[#d6b56d] bg-[#d6b56d]/10"
+                          : "border-stone-200 bg-white hover:border-stone-300"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-stone-900">
+                          {item}
+                        </p>
 
-                          <p className="mt-1 text-xs text-stone-500">
-                            {item === "Draft"
-                              ? "Keep the course hidden for now."
-                              : "Make the course visible to students."}
-                          </p>
+                        <p className="mt-1 text-xs text-stone-500">
+                          {item === "Draft"
+                            ? "Keep the course hidden for now."
+                            : "Make the course visible to students."}
+                        </p>
+                      </div>
+
+                      {status === item && (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
+                          <Check className="h-4 w-4" />
                         </div>
-
-                        {status === item && (
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
-                            <Check className="h-4 w-4" />
-                          </div>
-                        )}
-                      </button>
-                    )
-                  )}
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -630,9 +698,12 @@ export default function NewCoursePage() {
 
                 <button
                   type="button"
-                  onClick={() => setFeatured(!featured)}
+                  disabled={!!createdCourseId}
+                  onClick={() =>
+                    setFeatured(!featured)
+                  }
                   aria-pressed={featured}
-                  className={`relative h-6 w-11 rounded-full transition ${
+                  className={`relative h-6 w-11 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     featured
                       ? "bg-stone-900"
                       : "bg-stone-300"
@@ -640,7 +711,9 @@ export default function NewCoursePage() {
                 >
                   <span
                     className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                      featured ? "left-6" : "left-1"
+                      featured
+                        ? "left-6"
+                        : "left-1"
                     }`}
                   />
                 </button>
@@ -658,19 +731,33 @@ export default function NewCoursePage() {
               Cancel
             </Link>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
+            {!createdCourseId && (
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
 
-              {submitting ? "Saving..." : "Save Course"}
-            </button>
+                {submitting
+                  ? "Saving..."
+                  : "Save Course"}
+              </button>
+            )}
+
+            {createdCourseId && (
+              <Link
+                href={`/admin/courses/${createdCourseId}/lessons/new`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add Lesson
+              </Link>
+            )}
           </div>
 
         </form>

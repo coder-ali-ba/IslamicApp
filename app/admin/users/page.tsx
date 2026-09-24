@@ -1,279 +1,720 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Search,
-  SlidersHorizontal,
-  MoreHorizontal,
-  UserPlus,
-  ShieldCheck,
+  Users,
   GraduationCap,
-  User,
+  UserCheck,
+  ShieldCheck,
+  RefreshCw,
+  MoreHorizontal,
+  UserCog,
 } from "lucide-react";
 
-const users = [
-  {
-    id: 1,
-    name: "Ahmed Khan",
-    email: "ahmed@example.com",
-    role: "Student",
-    status: "Active",
-    joined: "Sep 12, 2026",
-  },
-  {
-    id: 2,
-    name: "Fatima Ali",
-    email: "fatima@example.com",
-    role: "Student",
-    status: "Active",
-    joined: "Sep 10, 2026",
-  },
-  {
-    id: 3,
-    name: "Ustadh Muhammad Ahmed",
-    email: "muhammad@example.com",
-    role: "Teacher",
-    status: "Active",
-    joined: "Sep 05, 2026",
-  },
-  {
-    id: 4,
-    name: "Usman Malik",
-    email: "usman@example.com",
-    role: "Student",
-    status: "Inactive",
-    joined: "Aug 28, 2026",
-  },
-  {
-    id: 5,
-    name: "Dr. Ibrahim Khan",
-    email: "ibrahim@example.com",
-    role: "Teacher",
-    status: "Active",
-    joined: "Aug 24, 2026",
-  },
-];
+import api from "@/app/src/lib/api";
 
-export default function UsersPage() {
+type UserRole =
+  | "student"
+  | "teacher"
+  | "scholar"
+  | "admin";
+
+type AdminUser = {
+  _id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  isVerified: boolean;
+  createdAt?: string;
+};
+
+type Stats = {
+  totalUsers: number;
+  students: number;
+  teachers: number;
+  scholars: number;
+  admins: number;
+  activeUsers: number;
+  inactiveUsers: number;
+};
+
+const initialStats: Stats = {
+  totalUsers: 0,
+  students: 0,
+  teachers: 0,
+  scholars: 0,
+  admins: 0,
+  activeUsers: 0,
+  inactiveUsers: 0,
+};
+
+const roleLabels: Record<UserRole, string> = {
+  student: "Student",
+  teacher: "Teacher",
+  scholar: "Scholar",
+  admin: "Admin",
+};
+
+const roleClasses: Record<UserRole, string> = {
+  student: "bg-stone-100 text-stone-700",
+  teacher: "bg-amber-50 text-amber-700",
+  scholar: "bg-yellow-50 text-yellow-700",
+  admin: "bg-stone-900 text-white",
+};
+
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [stats, setStats] = useState<Stats>(initialStats);
+
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState("All");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    const matchesRole = role === "All" || user.role === role;
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    return matchesSearch && matchesRole;
-  });
+      const params = new URLSearchParams();
+
+      if (search.trim()) {
+        params.append("search", search.trim());
+      }
+
+      if (roleFilter !== "all") {
+        params.append("role", roleFilter);
+      }
+
+      if (statusFilter !== "all") {
+        params.append("status", statusFilter);
+      }
+
+      const query = params.toString();
+
+      const response = await api.get(
+        `/auth/admin/users${query ? `?${query}` : ""}`
+      );
+
+      if (response.data.success) {
+        setUsers(response.data.users || []);
+        setStats(response.data.stats || initialStats);
+      }
+    } catch (error: any) {
+      console.error("Fetch users error:", error);
+
+      setError(
+        error?.response?.data?.message ||
+          "Failed to load users."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter change
+  useEffect(() => {
+    fetchUsers();
+  }, [roleFilter, statusFilter]);
+
+  // Search with small delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleStatusChange = async (
+    userId: string,
+    currentStatus: boolean
+  ) => {
+    const action = currentStatus
+      ? "deactivate"
+      : "activate";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${action} this user?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.patch(
+        `/auth/admin/users/${userId}/status`,
+        {
+          isActive: !currentStatus,
+        }
+      );
+
+      await fetchUsers();
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          "Failed to update user status."
+      );
+    }
+  };
+
+  const handleRoleChange = async (
+    userId: string,
+    currentRole: UserRole
+  ) => {
+    const newRole = window.prompt(
+      "Enter new role: student, teacher, scholar, admin",
+      currentRole
+    );
+
+    if (!newRole) return;
+
+    const normalizedRole = newRole
+      .trim()
+      .toLowerCase();
+
+    const allowedRoles = [
+      "student",
+      "teacher",
+      "scholar",
+      "admin",
+    ];
+
+    if (!allowedRoles.includes(normalizedRole)) {
+      alert(
+        "Invalid role. Use student, teacher, scholar or admin."
+      );
+      return;
+    }
+
+    if (normalizedRole === currentRole) {
+      return;
+    }
+
+    try {
+      await api.patch(
+        `/auth/admin/users/${userId}/role`,
+        {
+          role: normalizedRole,
+        }
+      );
+
+      await fetchUsers();
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ||
+          "Failed to update user role."
+      );
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-[#967438]">Management</p>
+          <p className="text-sm font-medium text-[#967438]">
+            User Management
+          </p>
 
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+          <h1 className="mt-1 text-2xl font-semibold text-stone-900">
             Users
-          </h2>
+          </h1>
 
           <p className="mt-1 text-sm text-stone-500">
-            Manage students, teachers, and administrators.
+            Manage students, teachers, scholars and admins.
           </p>
         </div>
 
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-stone-800">
-          <UserPlus className="h-4 w-4" />
-          Add User
+        <button
+          type="button"
+          onClick={fetchUsers}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw
+            size={16}
+            className={loading ? "animate-spin" : ""}
+          />
+
+          Refresh
         </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Total Users"
+          value={stats.totalUsers}
+          icon={<Users size={20} />}
+        />
+
+        <StatCard
+          title="Students"
+          value={stats.students}
+          icon={<GraduationCap size={20} />}
+        />
+
+        <StatCard
+          title="Teachers & Scholars"
+          value={
+            stats.teachers + stats.scholars
+          }
+          icon={<UserCheck size={20} />}
+        />
+
+        <StatCard
+          title="Active Users"
+          value={stats.activeUsers}
+          icon={<ShieldCheck size={20} />}
+        />
       </div>
 
       {/* Filters */}
       <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
           {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <div className="relative">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+            />
 
             <input
               type="text"
-              placeholder="Search by name or email..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-11 w-full rounded-xl border border-stone-200 bg-[#faf9f6] pl-10 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Search by name or email..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 py-2.5 pl-10 pr-4 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[#c5a45d] focus:bg-white"
             />
           </div>
 
-          {/* Role Filter */}
-          <div className="relative">
-            <SlidersHorizontal className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          {/* Role */}
+          <select
+            value={roleFilter}
+            onChange={(e) =>
+              setRoleFilter(e.target.value)
+            }
+            className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700 outline-none focus:border-[#c5a45d]"
+          >
+            <option value="all">
+              All Roles
+            </option>
 
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="h-11 w-full appearance-none rounded-xl border border-stone-200 bg-[#faf9f6] pl-10 pr-10 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 md:w-44"
-            >
-              <option value="All">All Roles</option>
-              <option value="Student">Students</option>
-              <option value="Teacher">Teachers</option>
-              <option value="Admin">Admins</option>
-            </select>
-          </div>
+            <option value="student">
+              Students
+            </option>
+
+            <option value="teacher">
+              Teachers
+            </option>
+
+            <option value="scholar">
+              Scholars
+            </option>
+
+            <option value="admin">
+              Admins
+            </option>
+          </select>
+
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+            className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700 outline-none focus:border-[#c5a45d]"
+          >
+            <option value="all">
+              All Status
+            </option>
+
+            <option value="active">
+              Active
+            </option>
+
+            <option value="inactive">
+              Inactive
+            </option>
+          </select>
         </div>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-        {/* Desktop */}
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/70">
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  User
-                </th>
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Role
-                </th>
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Joined
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  Action
-                </th>
-              </tr>
-            </thead>
+        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-stone-900">
+              All Users
+            </h2>
 
-            <tbody className="divide-y divide-stone-100">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="transition hover:bg-stone-50/60">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-semibold text-stone-700">
-                        {user.name.charAt(0)}
-                      </div>
+            <p className="mt-1 text-sm text-stone-500">
+              {users.length} users found
+            </p>
+          </div>
+        </div>
 
-                      <div>
-                        <p className="text-sm font-medium text-stone-900">
+        {loading ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-stone-500">
+              <RefreshCw
+                size={18}
+                className="animate-spin"
+              />
+              Loading users...
+            </div>
+          </div>
+        ) : users.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full">
+                <thead className="bg-stone-50">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-stone-500">
+                    <th className="px-5 py-4">
+                      User
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Role
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Status
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Verification
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Joined
+                    </th>
+
+                    <th className="px-5 py-4 text-right">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-stone-100">
+                  {users.map((user) => (
+                    <tr
+                      key={user._id}
+                      className="transition hover:bg-stone-50/60"
+                    >
+                      {/* User */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            name={user.name}
+                          />
+
+                          <div>
+                            <Link
+                              href={`/admin/users/${user._id}`}
+                              className="font-medium text-stone-900 hover:text-[#967438]"
+                            >
+                              {user.name}
+                            </Link>
+
+                            <p className="text-sm text-stone-500">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-5 py-4">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleClasses[user.role]}`}
+                        >
+                          {roleLabels[user.role]}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          active={user.isActive}
+                        />
+                      </td>
+
+                      {/* Verification */}
+                      <td className="px-5 py-4">
+                        {user.isVerified ? (
+                          <span className="text-sm font-medium text-green-700">
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="text-sm text-stone-400">
+                            Not verified
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Joined */}
+                      <td className="px-5 py-4 text-sm text-stone-500">
+                        {formatDate(
+                          user.createdAt
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRoleChange(
+                                user._id,
+                                user.role
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:bg-stone-100"
+                          >
+                            <UserCog size={14} />
+                            Role
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleStatusChange(
+                                user._id,
+                                user.isActive
+                              )
+                            }
+                            className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                              user.isActive
+                                ? "border-red-200 text-red-600 hover:bg-red-50"
+                                : "border-green-200 text-green-700 hover:bg-green-50"
+                            }`}
+                          >
+                            {user.isActive
+                              ? "Deactivate"
+                              : "Activate"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="divide-y divide-stone-100 md:hidden">
+              {users.map((user) => (
+                <div
+                  key={user._id}
+                  className="p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar
+                        name={user.name}
+                      />
+
+                      <div className="min-w-0">
+                        <Link
+                          href={`/admin/users/${user._id}`}
+                          className="block truncate font-medium text-stone-900"
+                        >
                           {user.name}
-                        </p>
-                        <p className="mt-0.5 text-xs text-stone-500">
+                        </Link>
+
+                        <p className="truncate text-sm text-stone-500">
                           {user.email}
                         </p>
                       </div>
                     </div>
-                  </td>
 
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                      {user.role === "Teacher" ? (
-                        <GraduationCap className="h-3.5 w-3.5" />
-                      ) : (
-                        <User className="h-3.5 w-3.5" />
-                      )}
-                      {user.role}
-                    </span>
-                  </td>
+                    <MoreHorizontal
+                      size={20}
+                      className="shrink-0 text-stone-400"
+                    />
+                  </div>
 
-                  <td className="px-6 py-4">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                        user.status === "Active"
-                          ? "text-emerald-700"
-                          : "text-stone-400"
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleClasses[user.role]}`}
+                    >
+                      {roleLabels[user.role]}
+                    </span>
+
+                    <StatusBadge
+                      active={user.isActive}
+                    />
+
+                    {user.isVerified && (
+                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleRoleChange(
+                          user._id,
+                          user.role
+                        )
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50"
+                    >
+                      <UserCog size={15} />
+                      Change Role
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleStatusChange(
+                          user._id,
+                          user.isActive
+                        )
+                      }
+                      className={`rounded-xl border px-3 py-2.5 text-sm font-medium ${
+                        user.isActive
+                          ? "border-red-200 text-red-600 hover:bg-red-50"
+                          : "border-green-200 text-green-700 hover:bg-green-50"
                       }`}
                     >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          user.status === "Active"
-                            ? "bg-emerald-600"
-                            : "bg-stone-300"
-                        }`}
-                      />
-                      {user.status}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-stone-500">
-                    {user.joined}
-                  </td>
-
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      aria-label={`Actions for ${user.name}`}
-                      className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
-                    >
-                      <MoreHorizontal className="h-5 w-5" />
+                      {user.isActive
+                        ? "Deactivate"
+                        : "Activate"}
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile */}
-        <div className="divide-y divide-stone-100 md:hidden">
-          {filteredUsers.map((user) => (
-            <div key={user.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-100 text-sm font-semibold text-stone-700">
-                    {user.name.charAt(0)}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-stone-900">
-                      {user.name}
-                    </p>
-                    <p className="truncate text-xs text-stone-500">
-                      {user.email}
-                    </p>
                   </div>
                 </div>
-
-                <button
-                  aria-label={`Actions for ${user.name}`}
-                  className="rounded-lg p-2 text-stone-400 hover:bg-stone-100"
-                >
-                  <MoreHorizontal className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between">
-                <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                  {user.role}
-                </span>
-
-                <span
-                  className={`text-xs font-medium ${
-                    user.status === "Active"
-                      ? "text-emerald-700"
-                      : "text-stone-400"
-                  }`}
-                >
-                  {user.status}
-                </span>
-              </div>
+              ))}
             </div>
-          ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
-          {filteredUsers.length === 0 && (
-            <div className="px-6 py-12 text-center text-sm text-stone-500">
-              No users found.
-            </div>
-          )}
+function StatCard({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5f0e5] text-[#967438]">
+          {icon}
         </div>
+
+        <span className="text-2xl font-semibold text-stone-900">
+          {value}
+        </span>
       </div>
 
-      {/* Result count */}
-      <p className="text-xs text-stone-400">
-        Showing {filteredUsers.length} of {users.length} users
+      <p className="mt-4 text-sm text-stone-500">
+        {title}
+      </p>
+    </div>
+  );
+}
+
+function UserAvatar({
+  name,
+}: {
+  name: string;
+}) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) =>
+      part.charAt(0).toUpperCase()
+    )
+    .join("");
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-900 text-sm font-semibold text-white">
+      {initials || "U"}
+    </div>
+  );
+}
+
+function StatusBadge({
+  active,
+}: {
+  active: boolean;
+}) {
+  if (active) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-green-700">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        Active
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-red-600">
+      <span className="h-2 w-2 rounded-full bg-red-500" />
+      Inactive
+    </span>
+  );
+}
+
+function formatDate(date?: string) {
+  if (!date) return "—";
+
+  return new Date(date).toLocaleDateString(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-stone-100">
+        <Users
+          size={26}
+          className="text-stone-400"
+        />
+      </div>
+
+      <h3 className="mt-4 font-semibold text-stone-800">
+        No users found
+      </h3>
+
+      <p className="mt-1 text-sm text-stone-500">
+        Try changing your search or filters.
       </p>
     </div>
   );

@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
 import {
   CalendarDays,
   ChevronDown,
   Clock3,
   Edit3,
+  Loader2,
   MoreVertical,
   Plus,
   Search,
@@ -13,114 +16,102 @@ import {
   Video,
 } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+type ClassStatus =
+  | "Live"
+  | "Upcoming"
+  | "Completed"
+  | "Cancelled";
+
 type ClassItem = {
+  _id: string;
   id: string;
   title: string;
+  description?: string;
   category: string;
   level: string;
-  date: string;
-  time: string;
+  scheduledAt: string;
+  durationMinutes: number;
   duration: string;
   students: number;
   maxStudents: number;
-  status: "Live" | "Upcoming" | "Completed" | "Cancelled";
+  status: ClassStatus;
+  meetingUrl?: string;
 };
 
-const classes: ClassItem[] = [
-  {
-    id: "class-1",
-    title: "Quran Reading Live Class",
-    category: "Quran",
-    level: "Beginner",
-    date: "19 Sep 2026",
-    time: "07:00 PM",
-    duration: "60 min",
-    students: 24,
-    maxStudents: 30,
-    status: "Live",
-  },
-  {
-    id: "class-2",
-    title: "Tajweed Correction Session",
-    category: "Tajweed",
-    level: "Intermediate",
-    date: "20 Sep 2026",
-    time: "06:30 PM",
-    duration: "60 min",
-    students: 18,
-    maxStudents: 25,
-    status: "Upcoming",
-  },
-  {
-    id: "class-3",
-    title: "Hadith Study Circle",
-    category: "Hadith",
-    level: "Intermediate",
-    date: "21 Sep 2026",
-    time: "08:00 PM",
-    duration: "90 min",
-    students: 31,
-    maxStudents: 40,
-    status: "Upcoming",
-  },
-  {
-    id: "class-4",
-    title: "Arabic Speaking Practice",
-    category: "Arabic",
-    level: "Beginner",
-    date: "16 Sep 2026",
-    time: "07:30 PM",
-    duration: "60 min",
-    students: 16,
-    maxStudents: 25,
-    status: "Completed",
-  },
-  {
-    id: "class-5",
-    title: "Fiqh for Everyday Life",
-    category: "Fiqh",
-    level: "Beginner",
-    date: "14 Sep 2026",
-    time: "06:00 PM",
-    duration: "60 min",
-    students: 22,
-    maxStudents: 30,
-    status: "Completed",
-  },
-  {
-    id: "class-6",
-    title: "Advanced Tajweed Workshop",
-    category: "Tajweed",
-    level: "Advanced",
-    date: "12 Sep 2026",
-    time: "08:00 PM",
-    duration: "90 min",
-    students: 12,
-    maxStudents: 20,
-    status: "Cancelled",
-  },
-];
-
 export default function TeacherClassesPage() {
+  const [classes, setClasses] = useState<ClassItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("All");
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchClasses = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/classes/teacher/my`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to fetch classes"
+        );
+      }
+
+      setClasses(data.classes || []);
+    } catch (error) {
+      console.error("Fetch classes error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch classes"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchClasses();
+  }, []);
+
   const filteredClasses = useMemo(() => {
     return classes.filter((item) => {
+      const searchValue = search.toLowerCase().trim();
+
       const matchesSearch =
-        item.title.toLowerCase().includes(search.toLowerCase()) ||
-        item.category.toLowerCase().includes(search.toLowerCase());
+        !searchValue ||
+        item.title.toLowerCase().includes(searchValue) ||
+        item.category.toLowerCase().includes(searchValue);
 
       const matchesCategory =
-        category === "All" || item.category === category;
+        category === "All" ||
+        item.category === category;
 
       const matchesStatus =
-        status === "All" || item.status === status;
+        status === "All" ||
+        item.status === status;
 
-      return matchesSearch && matchesCategory && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesStatus
+      );
     });
-  }, [search, category, status]);
+  }, [classes, search, category, status]);
 
   const liveClasses = classes.filter(
     (item) => item.status === "Live"
@@ -138,6 +129,98 @@ export default function TeacherClassesPage() {
     (total, item) => total + item.students,
     0
   );
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (date: string) => {
+    return new Date(date).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const deleteClass = async (classId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this class?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/classes/teacher/my/${classId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to delete class"
+        );
+      }
+
+      setClasses((previous) =>
+        previous.filter(
+          (item) => item._id !== classId
+        )
+      );
+    } catch (error) {
+      console.error("Delete class error:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete class"
+      );
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-stone-500">
+          <Loader2 className="h-7 w-7 animate-spin text-[#967438]" />
+          <p className="text-sm">
+            Loading your classes...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-3xl py-12">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+          <h2 className="font-semibold text-red-800">
+            Unable to load classes
+          </h2>
+
+          <p className="mt-2 text-sm text-red-600">
+            {error}
+          </p>
+
+          <button
+            type="button"
+            onClick={fetchClasses}
+            className="mt-4 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-800"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -157,76 +240,42 @@ export default function TeacherClassesPage() {
           </p>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href="/teacher/classes/new"
           className="inline-flex w-fit items-center gap-2 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
         >
           <Plus className="h-4 w-4" />
           Create Class
-        </button>
+        </Link>
       </section>
 
       {/* Stats */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-stone-500">
-                Total Classes
-              </p>
+        <StatCard
+          title="Total Classes"
+          value={classes.length}
+          icon={
+            <CalendarDays className="h-5 w-5" />
+          }
+        />
 
-              <p className="mt-2 text-3xl font-semibold text-stone-900">
-                {classes.length}
-              </p>
-            </div>
+        <StatCard
+          title="Live Now"
+          value={liveClasses}
+          description="Currently active"
+        />
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-stone-900 text-[#d6b56d]">
-              <CalendarDays className="h-5 w-5" />
-            </div>
-          </div>
-        </div>
+        <StatCard
+          title="Upcoming"
+          value={upcomingClasses}
+          description="Scheduled classes"
+        />
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-stone-500">
-            Live Now
-          </p>
-
-          <p className="mt-2 text-3xl font-semibold text-stone-900">
-            {liveClasses}
-          </p>
-
-          <p className="mt-1 text-xs text-stone-400">
-            Currently active
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-stone-500">
-            Upcoming
-          </p>
-
-          <p className="mt-2 text-3xl font-semibold text-stone-900">
-            {upcomingClasses}
-          </p>
-
-          <p className="mt-1 text-xs text-stone-400">
-            Scheduled classes
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-stone-500">
-            Class Enrollments
-          </p>
-
-          <p className="mt-2 text-3xl font-semibold text-stone-900">
-            {totalStudents}
-          </p>
-
-          <p className="mt-1 text-xs text-stone-400">
-            Total registrations
-          </p>
-        </div>
+        <StatCard
+          title="Class Enrollments"
+          value={totalStudents}
+          description="Total registrations"
+        />
       </section>
 
       {/* Filters */}
@@ -239,7 +288,9 @@ export default function TeacherClassesPage() {
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
               placeholder="Search classes..."
               className="h-11 w-full rounded-xl border border-stone-200 bg-stone-50 pl-10 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
             />
@@ -249,15 +300,23 @@ export default function TeacherClassesPage() {
           <div className="relative">
             <select
               value={category}
-              onChange={(event) => setCategory(event.target.value)}
+              onChange={(event) =>
+                setCategory(event.target.value)
+              }
               className="h-11 w-full appearance-none rounded-xl border border-stone-200 bg-stone-50 px-4 pr-10 text-sm text-stone-700 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 sm:w-48"
             >
-              <option value="All">All Categories</option>
+              <option value="All">
+                All Categories
+              </option>
               <option value="Quran">Quran</option>
               <option value="Tajweed">Tajweed</option>
               <option value="Arabic">Arabic</option>
               <option value="Hadith">Hadith</option>
               <option value="Fiqh">Fiqh</option>
+              <option value="Seerah">Seerah</option>
+              <option value="Islamic Studies">
+                Islamic Studies
+              </option>
             </select>
 
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
@@ -267,14 +326,24 @@ export default function TeacherClassesPage() {
           <div className="relative">
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) =>
+                setStatus(event.target.value)
+              }
               className="h-11 w-full appearance-none rounded-xl border border-stone-200 bg-stone-50 px-4 pr-10 text-sm text-stone-700 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 sm:w-48"
             >
-              <option value="All">All Status</option>
+              <option value="All">
+                All Status
+              </option>
               <option value="Live">Live</option>
-              <option value="Upcoming">Upcoming</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
+              <option value="Upcoming">
+                Upcoming
+              </option>
+              <option value="Completed">
+                Completed
+              </option>
+              <option value="Cancelled">
+                Cancelled
+              </option>
             </select>
 
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
@@ -292,155 +361,175 @@ export default function TeacherClassesPage() {
       </p>
 
       {/* Classes */}
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {filteredClasses.map((item) => (
-          <article
-            key={item.id}
-            className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
-          >
-            {/* Top */}
-            <div className="relative flex h-32 items-center justify-center bg-stone-900">
-              <Video className="h-11 w-11 text-[#d6b56d]" />
+      {filteredClasses.length > 0 ? (
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {filteredClasses.map((item) => (
+            <article
+              key={item._id}
+              className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+            >
+              {/* Top */}
+              <div className="relative flex h-32 items-center justify-center bg-stone-900">
+                <Video className="h-11 w-11 text-[#d6b56d]" />
 
-              <span className="absolute left-4 top-4 rounded-full bg-[#d6b56d] px-2.5 py-1 text-[10px] font-semibold text-stone-950">
-                {item.category}
-              </span>
+                <span className="absolute left-4 top-4 rounded-full bg-[#d6b56d] px-2.5 py-1 text-[10px] font-semibold text-stone-950">
+                  {item.category}
+                </span>
 
-              <span
-                className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                  item.status === "Live"
-                    ? "bg-red-50 text-red-700"
-                    : item.status === "Upcoming"
-                      ? "bg-amber-50 text-amber-700"
-                      : item.status === "Completed"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-stone-100 text-stone-600"
-                }`}
-              >
-                {item.status}
-              </span>
-            </div>
-
-            {/* Content */}
-            <div className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold text-stone-900">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-1 text-xs text-stone-500">
-                    {item.level}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
-                  aria-label="More options"
+                <span
+                  className={`absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                    item.status === "Live"
+                      ? "bg-red-50 text-red-700"
+                      : item.status === "Upcoming"
+                        ? "bg-amber-50 text-amber-700"
+                        : item.status === "Completed"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-stone-100 text-stone-600"
+                  }`}
                 >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
+                  {item.status}
+                </span>
               </div>
 
-              {/* Schedule */}
-              <div className="mt-5 space-y-3">
-                <div className="flex items-center gap-3 rounded-xl bg-stone-50 p-3">
-                  <CalendarDays className="h-4 w-4 text-[#967438]" />
-
+              {/* Content */}
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] text-stone-400">
-                      Date
-                    </p>
+                    <h3 className="font-semibold text-stone-900">
+                      {item.title}
+                    </h3>
 
-                    <p className="text-sm font-medium text-stone-800">
-                      {item.date}
+                    <p className="mt-1 text-xs text-stone-500">
+                      {item.level}
                     </p>
+                  </div>
+
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      className="rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
+                      aria-label="More options"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+
+                    <div className="invisible absolute right-0 top-8 z-20 w-32 rounded-xl border border-stone-200 bg-white p-1 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
+                      <Link
+                        href={`/teacher/classes/${item._id}/edit`}
+                        className="block rounded-lg px-3 py-2 text-xs text-stone-700 hover:bg-stone-50"
+                      >
+                        Edit
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteClass(item._id)
+                        }
+                        className="block w-full rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 rounded-xl bg-stone-50 p-3">
-                  <Clock3 className="h-4 w-4 text-[#967438]" />
+                {/* Schedule */}
+                <div className="mt-5 space-y-3">
+                  <InfoRow
+                    icon={
+                      <CalendarDays className="h-4 w-4" />
+                    }
+                    label="Date"
+                    value={formatDate(
+                      item.scheduledAt
+                    )}
+                  />
 
-                  <div>
-                    <p className="text-[11px] text-stone-400">
-                      Time & Duration
-                    </p>
+                  <InfoRow
+                    icon={
+                      <Clock3 className="h-4 w-4" />
+                    }
+                    label="Time & Duration"
+                    value={`${formatTime(
+                      item.scheduledAt
+                    )} · ${item.duration}`}
+                  />
 
-                    <p className="text-sm font-medium text-stone-800">
-                      {item.time} · {item.duration}
-                    </p>
-                  </div>
+                  <InfoRow
+                    icon={
+                      <Users className="h-4 w-4" />
+                    }
+                    label="Students"
+                    value={`${item.students} / ${item.maxStudents}`}
+                  />
                 </div>
 
-                <div className="flex items-center gap-3 rounded-xl bg-stone-50 p-3">
-                  <Users className="h-4 w-4 text-[#967438]" />
+                {/* Actions */}
+                <div className="mt-5 flex items-center gap-2 border-t border-stone-100 pt-4">
+                  {item.status === "Live" && (
+                    <>
+                      {item.meetingUrl ? (
+                        <a
+                          href={item.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-center text-sm font-medium text-[#d6b56d] transition hover:bg-stone-800"
+                        >
+                          Join Class
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="flex-1 rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-400"
+                        >
+                          Meeting Not Set
+                        </button>
+                      )}
+                    </>
+                  )}
 
-                  <div>
-                    <p className="text-[11px] text-stone-400">
-                      Students
-                    </p>
+                  {item.status === "Upcoming" && (
+                    <Link
+                      href={`/teacher/classes/${item._id}/edit`}
+                      className="flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-stone-800"
+                    >
+                      Manage
+                    </Link>
+                  )}
 
-                    <p className="text-sm font-medium text-stone-800">
-                      {item.students} / {item.maxStudents}
-                    </p>
-                  </div>
+                  {item.status === "Completed" && (
+                    <Link
+                      href={`/teacher/classes/${item._id}/edit`}
+                      className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-center text-sm font-medium text-stone-700 transition hover:border-[#d6b56d]"
+                    >
+                      View Details
+                    </Link>
+                  )}
+
+                  {item.status === "Cancelled" && (
+                    <Link
+                      href={`/teacher/classes/${item._id}/edit`}
+                      className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-center text-sm font-medium text-stone-500"
+                    >
+                      View Details
+                    </Link>
+                  )}
+
+                  <Link
+                    href={`/teacher/classes/${item._id}/edit`}
+                    className="rounded-xl border border-stone-200 p-2.5 text-stone-500 transition hover:border-[#d6b56d] hover:text-stone-900"
+                    title="Edit class"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </Link>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="mt-5 flex items-center gap-2 border-t border-stone-100 pt-4">
-                {item.status === "Live" && (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-medium text-[#d6b56d] transition hover:bg-stone-800"
-                  >
-                    Join Class
-                  </button>
-                )}
-
-                {item.status === "Upcoming" && (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
-                  >
-                    Manage
-                  </button>
-                )}
-
-                {item.status === "Completed" && (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-[#d6b56d]"
-                  >
-                    View Details
-                  </button>
-                )}
-
-                {item.status === "Cancelled" && (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-500"
-                  >
-                    View Details
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="rounded-xl border border-stone-200 p-2.5 text-stone-500 transition hover:border-[#d6b56d] hover:text-stone-900"
-                  title="Edit class"
-                >
-                  <Edit3 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      {/* Empty State */}
-      {filteredClasses.length === 0 && (
+            </article>
+          ))}
+        </section>
+      ) : (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-16 text-center">
           <CalendarDays className="mx-auto h-10 w-10 text-stone-300" />
 
@@ -453,6 +542,82 @@ export default function TeacherClassesPage() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/* --------------------------------
+   Stat Card
+-------------------------------- */
+
+function StatCard({
+  title,
+  value,
+  description,
+  icon,
+}: {
+  title: string;
+  value: number;
+  description?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-stone-500">
+            {title}
+          </p>
+
+          <p className="mt-2 text-3xl font-semibold text-stone-900">
+            {value}
+          </p>
+
+          {description && (
+            <p className="mt-1 text-xs text-stone-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {icon && (
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-stone-900 text-[#d6b56d]">
+            {icon}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------
+   Info Row
+-------------------------------- */
+
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-stone-50 p-3">
+      <div className="text-[#967438]">
+        {icon}
+      </div>
+
+      <div>
+        <p className="text-[11px] text-stone-400">
+          {label}
+        </p>
+
+        <p className="text-sm font-medium text-stone-800">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }

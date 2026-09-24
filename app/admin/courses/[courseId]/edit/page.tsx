@@ -6,8 +6,12 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  Edit3,
+  ExternalLink,
   Loader2,
+  Plus,
   Save,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,11 +29,20 @@ type CourseForm = {
   level: string;
   instructor: string;
   duration: string;
-  lessons: string;
   price: string;
   image: string;
   status: "Draft" | "Published";
   featured: boolean;
+};
+
+type Lesson = {
+  _id: string;
+  title: string;
+  description: string;
+  duration: string;
+  order: number;
+  status: "Draft" | "Published";
+  videoUrl: string;
 };
 
 const categories = [
@@ -50,8 +63,12 @@ export default function EditCoursePage() {
   const courseId = params.courseId as string;
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [lessonsLoading, setLessonsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingLesson, setDeletingLesson] = useState<string | null>(null);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -63,7 +80,6 @@ export default function EditCoursePage() {
     level: "",
     instructor: "",
     duration: "",
-    lessons: "",
     price: "0",
     image: "",
     status: "Draft",
@@ -72,60 +88,56 @@ export default function EditCoursePage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+  // --------------------------------------------------
+  // FETCH COURSE + TEACHERS
+  // --------------------------------------------------
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError("");
 
-        // Fetch course
-        const courseResponse = await fetch(
-          `${API_URL}/courses/${courseId}`,
-          {
+        const [courseResponse, teachersResponse] = await Promise.all([
+          fetch(`${API_URL}/courses/${courseId}`, {
             credentials: "include",
-          }
-        );
+          }),
+
+          fetch(`${API_URL}/auth/teachers`, {
+            credentials: "include",
+          }),
+        ]);
 
         const courseData = await courseResponse.json();
+        const teachersData = await teachersResponse.json();
 
         if (!courseResponse.ok) {
           throw new Error(
-            courseData.message || "Failed to fetch course"
+            courseData?.message || "Failed to fetch course"
+          );
+        }
+
+        if (!teachersResponse.ok) {
+          throw new Error(
+            teachersData?.message || "Failed to fetch teachers"
           );
         }
 
         const course = courseData.course;
 
-        // Fetch teachers
-        const teachersResponse = await fetch(
-          `${API_URL}/auth/teachers`,
-          {
-            credentials: "include",
-          }
-        );
-
-        const teachersData = await teachersResponse.json();
-
-        if (!teachersResponse.ok) {
-          throw new Error(
-            teachersData.message || "Failed to fetch teachers"
-          );
-        }
-
         setTeachers(teachersData.teachers || []);
 
         setForm({
-          title: course.title || "",
-          description: course.description || "",
-          category: course.category || "",
-          level: course.level || "",
-          instructor: course.instructor?._id || "",
-          duration: course.duration || "",
-          lessons: String(course.lessons ?? ""),
-          price: String(course.price ?? 0),
-          image: course.image || "",
-          status: course.status || "Draft",
-          featured: course.featured ?? false,
+          title: course?.title || "",
+          description: course?.description || "",
+          category: course?.category || "",
+          level: course?.level || "",
+          instructor: course?.instructor?._id || "",
+          duration: course?.duration || "",
+          price: String(course?.price ?? 0),
+          image: course?.image || "",
+          status: course?.status || "Draft",
+          featured: course?.featured ?? false,
         });
       } catch (error) {
         console.error("Fetch Edit Course Error:", error);
@@ -145,6 +157,53 @@ export default function EditCoursePage() {
     }
   }, [API_URL, courseId]);
 
+  // --------------------------------------------------
+  // FETCH LESSONS
+  // --------------------------------------------------
+
+  const fetchLessons = async () => {
+    try {
+      setLessonsLoading(true);
+
+      const response = await fetch(
+        `${API_URL}/lessons/admin/course/${courseId}`,
+        {
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Failed to fetch lessons"
+        );
+      }
+
+      setLessons(data.lessons || []);
+    } catch (error) {
+      console.error("Fetch Lessons Error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load lessons"
+      );
+    } finally {
+      setLessonsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (courseId) {
+      fetchLessons();
+    }
+  }, [courseId]);
+
+  // --------------------------------------------------
+  // HANDLE COURSE FORM
+  // --------------------------------------------------
+
   const handleChange = (
     field: keyof CourseForm,
     value: string | boolean
@@ -155,7 +214,13 @@ export default function EditCoursePage() {
     }));
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  // --------------------------------------------------
+  // UPDATE COURSE
+  // --------------------------------------------------
+
+  const handleSubmit = async (
+    e: FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
     try {
@@ -178,7 +243,6 @@ export default function EditCoursePage() {
             level: form.level,
             instructor: form.instructor,
             duration: form.duration,
-            lessons: Number(form.lessons),
             price: Number(form.price),
             image: form.image,
             status: form.status,
@@ -191,15 +255,15 @@ export default function EditCoursePage() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Failed to update course"
+          data?.message || "Failed to update course"
         );
       }
 
       setSuccess("Course updated successfully.");
 
       setTimeout(() => {
-        router.push("/admin/courses");
-      }, 1000);
+        setSuccess("");
+      }, 3000);
     } catch (error) {
       console.error("Update Course Error:", error);
 
@@ -212,6 +276,63 @@ export default function EditCoursePage() {
       setSaving(false);
     }
   };
+
+  // --------------------------------------------------
+  // DELETE LESSON
+  // --------------------------------------------------
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this lesson?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingLesson(lessonId);
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/lessons/${lessonId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Failed to delete lesson"
+        );
+      }
+
+      setLessons((prev) =>
+        prev.filter((lesson) => lesson._id !== lessonId)
+      );
+
+      setSuccess("Lesson deleted successfully.");
+
+      setTimeout(() => {
+        setSuccess("");
+      }, 3000);
+    } catch (error) {
+      console.error("Delete Lesson Error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete lesson"
+      );
+    } finally {
+      setDeletingLesson(null);
+    }
+  };
+
+  // --------------------------------------------------
+  // LOADING
+  // --------------------------------------------------
 
   if (loading) {
     return (
@@ -229,9 +350,13 @@ export default function EditCoursePage() {
     );
   }
 
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {/* Header */}
+    <div className="mx-auto max-w-5xl space-y-6">
+      {/* HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link
@@ -258,9 +383,18 @@ export default function EditCoursePage() {
             </div>
           </div>
         </div>
+
+        {/* TOP LESSON BUTTON */}
+        <Link
+          href={`/admin/courses/${courseId}/lessons`}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+        >
+          <BookOpen className="h-4 w-4" />
+          Manage Lessons
+        </Link>
       </div>
 
-      {/* Error */}
+      {/* ERROR */}
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <p className="font-medium text-red-800">
@@ -273,7 +407,7 @@ export default function EditCoursePage() {
         </div>
       )}
 
-      {/* Success */}
+      {/* SUCCESS */}
       {success && (
         <div className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-5">
           <CheckCircle2 className="h-5 w-5 text-[#967438]" />
@@ -284,12 +418,12 @@ export default function EditCoursePage() {
         </div>
       )}
 
-      {/* Form */}
+      {/* COURSE FORM */}
       <form
         onSubmit={handleSubmit}
         className="space-y-6"
       >
-        {/* Basic Information */}
+        {/* BASIC INFORMATION */}
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <div className="mb-6">
             <h3 className="text-base font-semibold text-stone-900">
@@ -302,7 +436,7 @@ export default function EditCoursePage() {
           </div>
 
           <div className="space-y-5">
-            {/* Title */}
+            {/* TITLE */}
             <div>
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Course Title
@@ -322,7 +456,7 @@ export default function EditCoursePage() {
               />
             </div>
 
-            {/* Description */}
+            {/* DESCRIPTION */}
             <div>
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Description
@@ -331,7 +465,10 @@ export default function EditCoursePage() {
               <textarea
                 value={form.description}
                 onChange={(e) =>
-                  handleChange("description", e.target.value)
+                  handleChange(
+                    "description",
+                    e.target.value
+                  )
                 }
                 required
                 maxLength={2000}
@@ -341,7 +478,7 @@ export default function EditCoursePage() {
               />
             </div>
 
-            {/* Category + Level */}
+            {/* CATEGORY + LEVEL */}
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-medium text-stone-700">
@@ -351,12 +488,17 @@ export default function EditCoursePage() {
                 <select
                   value={form.category}
                   onChange={(e) =>
-                    handleChange("category", e.target.value)
+                    handleChange(
+                      "category",
+                      e.target.value
+                    )
                   }
                   required
                   className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 >
-                  <option value="">Select category</option>
+                  <option value="">
+                    Select category
+                  </option>
 
                   {categories.map((item) => (
                     <option key={item} value={item}>
@@ -374,12 +516,17 @@ export default function EditCoursePage() {
                 <select
                   value={form.level}
                   onChange={(e) =>
-                    handleChange("level", e.target.value)
+                    handleChange(
+                      "level",
+                      e.target.value
+                    )
                   }
                   required
                   className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 >
-                  <option value="">Select level</option>
+                  <option value="">
+                    Select level
+                  </option>
 
                   {levels.map((item) => (
                     <option key={item} value={item}>
@@ -392,7 +539,7 @@ export default function EditCoursePage() {
           </div>
         </div>
 
-        {/* Instructor & Course Details */}
+        {/* INSTRUCTOR & DETAILS */}
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <div className="mb-6">
             <h3 className="text-base font-semibold text-stone-900">
@@ -405,7 +552,7 @@ export default function EditCoursePage() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            {/* Instructor */}
+            {/* INSTRUCTOR */}
             <div className="sm:col-span-2">
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Instructor
@@ -414,7 +561,10 @@ export default function EditCoursePage() {
               <select
                 value={form.instructor}
                 onChange={(e) =>
-                  handleChange("instructor", e.target.value)
+                  handleChange(
+                    "instructor",
+                    e.target.value
+                  )
                 }
                 required
                 className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
@@ -434,7 +584,7 @@ export default function EditCoursePage() {
               </select>
             </div>
 
-            {/* Duration */}
+            {/* DURATION */}
             <div>
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Duration
@@ -444,7 +594,10 @@ export default function EditCoursePage() {
                 type="text"
                 value={form.duration}
                 onChange={(e) =>
-                  handleChange("duration", e.target.value)
+                  handleChange(
+                    "duration",
+                    e.target.value
+                  )
                 }
                 required
                 placeholder="e.g. 8 weeks"
@@ -452,26 +605,7 @@ export default function EditCoursePage() {
               />
             </div>
 
-            {/* Lessons */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-stone-700">
-                Number of Lessons
-              </label>
-
-              <input
-                type="number"
-                min={1}
-                value={form.lessons}
-                onChange={(e) =>
-                  handleChange("lessons", e.target.value)
-                }
-                required
-                placeholder="e.g. 24"
-                className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
-              />
-            </div>
-
-            {/* Price */}
+            {/* PRICE */}
             <div>
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Price (PKR)
@@ -482,15 +616,18 @@ export default function EditCoursePage() {
                 min={0}
                 value={form.price}
                 onChange={(e) =>
-                  handleChange("price", e.target.value)
+                  handleChange(
+                    "price",
+                    e.target.value
+                  )
                 }
                 placeholder="0"
                 className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
               />
             </div>
 
-            {/* Image */}
-            <div>
+            {/* IMAGE */}
+            <div className="sm:col-span-2">
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Image URL
               </label>
@@ -499,7 +636,10 @@ export default function EditCoursePage() {
                 type="url"
                 value={form.image}
                 onChange={(e) =>
-                  handleChange("image", e.target.value)
+                  handleChange(
+                    "image",
+                    e.target.value
+                  )
                 }
                 placeholder="https://..."
                 className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
@@ -508,7 +648,7 @@ export default function EditCoursePage() {
           </div>
         </div>
 
-        {/* Publishing */}
+        {/* PUBLISHING */}
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <div className="mb-6">
             <h3 className="text-base font-semibold text-stone-900">
@@ -521,7 +661,7 @@ export default function EditCoursePage() {
           </div>
 
           <div className="space-y-5">
-            {/* Status */}
+            {/* STATUS */}
             <div>
               <label className="mb-2 block text-sm font-medium text-stone-700">
                 Status
@@ -532,17 +672,24 @@ export default function EditCoursePage() {
                 onChange={(e) =>
                   handleChange(
                     "status",
-                    e.target.value as "Draft" | "Published"
+                    e.target.value as
+                      | "Draft"
+                      | "Published"
                   )
                 }
                 className="h-12 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
               >
-                <option value="Draft">Draft</option>
-                <option value="Published">Published</option>
+                <option value="Draft">
+                  Draft
+                </option>
+
+                <option value="Published">
+                  Published
+                </option>
               </select>
             </div>
 
-            {/* Featured */}
+            {/* FEATURED */}
             <label className="flex cursor-pointer items-center justify-between rounded-xl border border-stone-200 bg-[#faf9f6] p-4">
               <div>
                 <p className="text-sm font-medium text-stone-800">
@@ -558,7 +705,10 @@ export default function EditCoursePage() {
                 type="checkbox"
                 checked={form.featured}
                 onChange={(e) =>
-                  handleChange("featured", e.target.checked)
+                  handleChange(
+                    "featured",
+                    e.target.checked
+                  )
                 }
                 className="h-5 w-5 accent-[#967438]"
               />
@@ -566,7 +716,7 @@ export default function EditCoursePage() {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* COURSE ACTIONS */}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Link
             href="/admin/courses"
@@ -588,12 +738,191 @@ export default function EditCoursePage() {
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Save Changes
+                Save Course Changes
               </>
             )}
           </button>
         </div>
       </form>
+
+      {/* ================================================= */}
+      {/* LESSONS SECTION */}
+      {/* ================================================= */}
+
+      <div className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+        {/* LESSON HEADER */}
+        <div className="flex flex-col gap-4 border-b border-stone-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100">
+                <BookOpen className="h-5 w-5 text-[#967438]" />
+              </div>
+
+              <div>
+                <h3 className="text-base font-semibold text-stone-900">
+                  Course Lessons
+                </h3>
+
+                <p className="mt-1 text-sm text-stone-500">
+                  Add, edit or remove lessons for this course.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Link
+            href={`/admin/courses/${courseId}/lessons/new`}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 text-sm font-medium text-white transition hover:bg-stone-800"
+          >
+            <Plus className="h-4 w-4" />
+            Add Lesson
+          </Link>
+        </div>
+
+        {/* LESSONS */}
+        <div className="p-6">
+          {lessonsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="text-center">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#967438]" />
+
+                <p className="mt-3 text-sm text-stone-500">
+                  Loading lessons...
+                </p>
+              </div>
+            </div>
+          ) : lessons.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-[#faf9f6] px-6 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100">
+                <BookOpen className="h-5 w-5 text-stone-500" />
+              </div>
+
+              <h4 className="mt-4 text-sm font-semibold text-stone-900">
+                No lessons yet
+              </h4>
+
+              <p className="mt-1 text-sm text-stone-500">
+                Start adding lessons to this course.
+              </p>
+
+              <Link
+                href={`/admin/courses/${courseId}/lessons/new`}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add First Lesson
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {lessons.map((lesson, index) => (
+                <div
+                  key={lesson._id}
+                  className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-[#faf9f6] p-4 transition hover:border-stone-300 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  {/* LESSON INFO */}
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-900 text-sm font-semibold text-white">
+                      {lesson.order || index + 1}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="truncate text-sm font-semibold text-stone-900">
+                          {lesson.title}
+                        </h4>
+
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                            lesson.status === "Published"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {lesson.status}
+                        </span>
+                      </div>
+
+                      {lesson.description && (
+                        <p className="mt-1 line-clamp-2 text-sm text-stone-500">
+                          {lesson.description}
+                        </p>
+                      )}
+
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                        <span>
+                          Lesson {lesson.order}
+                        </span>
+
+                        {lesson.duration && (
+                          <span>
+                            {lesson.duration}
+                          </span>
+                        )}
+
+                        {lesson.videoUrl && (
+                          <span>
+                            Video available
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Link
+                      href={`/admin/courses/${courseId}/lessons/${lesson._id}/edit`}
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      Edit
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDeleteLesson(lesson._id)
+                      }
+                      disabled={
+                        deletingLesson === lesson._id
+                      }
+                      className="inline-flex h-10 items-center justify-center rounded-xl border border-red-200 bg-white px-3 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deletingLesson === lesson._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        {lessons.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-stone-200 bg-[#faf9f6] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-stone-500">
+              {lessons.length}{" "}
+              {lessons.length === 1
+                ? "lesson"
+                : "lessons"}{" "}
+              in this course
+            </p>
+
+            <Link
+              href={`/admin/courses/${courseId}/lessons`}
+              className="inline-flex items-center gap-2 text-sm font-medium text-[#967438] transition hover:text-stone-900"
+            >
+              Manage all lessons
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

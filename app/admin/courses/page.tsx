@@ -372,7 +372,7 @@ export default function AdminCoursesPage() {
                       className="transition hover:bg-stone-50/60"
                     >
                       <td className="px-6 py-5">
-                        <div className="flex items-center gap-3">
+                        <Link href={`/admin/courses/${course.id}`} className="flex items-center gap-3">
                           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
                             <BookOpen className="h-5 w-5" />
                           </div>
@@ -391,7 +391,7 @@ export default function AdminCoursesPage() {
                               <span>{course.lessons} lessons</span>
                             </div>
                           </div>
-                        </div>
+                        </Link>
                       </td>
 
                       <td className="px-6 py-5">
@@ -467,7 +467,7 @@ export default function AdminCoursesPage() {
               {filteredCourses.map((course) => (
                 <div key={course.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 gap-3">
+                    <Link href={`/admin/courses/${course.id}`} className="flex min-w-0 gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
                         <BookOpen className="h-5 w-5" />
                       </div>
@@ -481,7 +481,7 @@ export default function AdminCoursesPage() {
                           {course.instructor}
                         </p>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-center gap-1">
                       <Link
