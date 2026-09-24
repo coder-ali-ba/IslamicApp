@@ -190,8 +190,8 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
-            <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500">
+          <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6 scrollbar-none">
+            <p className="mb-3 px-3 text-[10px]  font-semibold uppercase tracking-[0.2em] text-stone-500">
               Main Menu
             </p>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -11,10 +11,12 @@ import {
   FileText,
   Loader2,
   Save,
+  Trash2,
 } from "lucide-react";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080/api";
 
 const categories = [
   "Aqeedah",
@@ -31,30 +33,83 @@ const categories = [
   "Other",
 ];
 
+const statuses = [
+  "Pending",
+  "Answered",
+  "Rejected",
+  "Closed",
+] as const;
+
+type FatwaStatus =
+  | "Pending"
+  | "Answered"
+  | "Rejected"
+  | "Closed";
+
 type Scholar = {
   _id: string;
   name: string;
   email: string;
-  role: "scholar";
+  role: "teacher" | "scholar";
 };
 
-type FatwaStatus = "Pending" | "Answered";
+type Fatwa = {
+  _id: string;
+  question: string;
+  shortAnswer?: string;
+  answer: string;
+  category: string;
+  status: FatwaStatus;
+  scholar?: {
+    _id: string;
+    name: string;
+    email: string;
+    role: "teacher" | "scholar";
+  } | null;
+  primaryReference?: string;
+  additionalReferences?: string;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
-export default function NewFatwaPage() {
+export default function EditFatwaPage() {
+  const params = useParams();
   const router = useRouter();
 
-  const [scholars, setScholars] = useState<Scholar[]>([]);
-  const [loadingScholars, setLoadingScholars] = useState(true);
+  const fatwaId = params.fatwaId as string;
+
+  const [fatwa, setFatwa] = useState<Fatwa | null>(
+    null
+  );
+
+  const [scholars, setScholars] = useState<Scholar[]>(
+    []
+  );
+
+  const [loading, setLoading] = useState(true);
+  const [loadingScholars, setLoadingScholars] =
+    useState(true);
+
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  /* =========================
+     FORM STATES
+  ========================= */
 
   const [question, setQuestion] = useState("");
+  const [shortAnswer, setShortAnswer] = useState("");
+  const [answer, setAnswer] = useState("");
   const [category, setCategory] = useState("");
   const [scholar, setScholar] = useState("");
 
-  const [shortAnswer, setShortAnswer] = useState("");
-  const [answer, setAnswer] = useState("");
-
   const [primaryReference, setPrimaryReference] =
     useState("");
+
   const [additionalReferences, setAdditionalReferences] =
     useState("");
 
@@ -63,8 +118,67 @@ export default function NewFatwaPage() {
 
   const [published, setPublished] = useState(false);
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  /* =========================
+     FETCH FATWA
+  ========================= */
+
+  useEffect(() => {
+    if (!fatwaId) return;
+
+    const fetchFatwa = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/fatwas/admin/${fatwaId}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to load Fatwa"
+          );
+        }
+
+        const item: Fatwa = data.fatwa;
+
+        setFatwa(item);
+
+        setQuestion(item.question || "");
+        setShortAnswer(item.shortAnswer || "");
+        setAnswer(item.answer || "");
+        setCategory(item.category || "");
+        setScholar(item.scholar?._id || "");
+        setPrimaryReference(
+          item.primaryReference || ""
+        );
+        setAdditionalReferences(
+          item.additionalReferences || ""
+        );
+        setStatus(item.status || "Pending");
+        setPublished(Boolean(item.published));
+      } catch (err) {
+        console.error("Fetch Fatwa Error:", err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load Fatwa"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFatwa();
+  }, [fatwaId]);
 
   /* =========================
      FETCH SCHOLARS
@@ -110,7 +224,7 @@ export default function NewFatwaPage() {
   }, []);
 
   /* =========================
-     SUBMIT FATWA
+     SAVE FATWA
   ========================= */
 
   const handleSubmit = async (
@@ -119,9 +233,10 @@ export default function NewFatwaPage() {
     e.preventDefault();
 
     setError("");
+    setSuccess("");
 
     if (!question.trim()) {
-      setError("Please enter the question.");
+      setError("Question cannot be empty.");
       return;
     }
 
@@ -137,40 +252,44 @@ export default function NewFatwaPage() {
 
     if (status === "Answered" && !answer.trim()) {
       setError(
-        "A detailed answer is required when the Fatwa is marked as Answered."
+        "Detailed answer is required for an Answered Fatwa."
+      );
+      return;
+    }
+
+    if (published && status !== "Answered") {
+      setError(
+        "A Fatwa can only be published after it is marked as Answered."
       );
       return;
     }
 
     try {
-      setSubmitting(true);
+      setSaving(true);
 
       const response = await fetch(
-        `${API_URL}/fatwas/admin`,
+        `${API_URL}/fatwas/admin/${fatwaId}`,
         {
-          method: "POST",
+          method: "PATCH",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             question: question.trim(),
+            shortAnswer: shortAnswer.trim(),
             answer: answer.trim(),
             category,
-            status,
             scholar,
-            published:
-              status === "Answered"
-                ? published
-                : false,
-
-            // These fields are sent as additional
-            // information for the backend.
-            shortAnswer: shortAnswer.trim(),
+            status,
             primaryReference:
               primaryReference.trim(),
             additionalReferences:
               additionalReferences.trim(),
+            published:
+              status === "Answered"
+                ? published
+                : false,
           }),
         }
       );
@@ -179,29 +298,138 @@ export default function NewFatwaPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Failed to create Fatwa"
+          data.message || "Failed to update Fatwa"
+        );
+      }
+
+      setFatwa(data.fatwa);
+
+      setSuccess(
+        "Fatwa updated successfully."
+      );
+
+      setTimeout(() => {
+        setSuccess("");
+      }, 3000);
+    } catch (err) {
+      console.error("Update Fatwa Error:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update Fatwa"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* =========================
+     DELETE FATWA
+  ========================= */
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this Fatwa?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/fatwas/admin/${fatwaId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to delete Fatwa"
         );
       }
 
       router.push("/admin/fatwas");
       router.refresh();
     } catch (err) {
-      console.error("Create Fatwa Error:", err);
+      console.error("Delete Fatwa Error:", err);
 
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to create Fatwa"
+          : "Failed to delete Fatwa"
       );
     } finally {
-      setSubmitting(false);
+      setDeleting(false);
     }
   };
+
+  /* =========================
+     LOADING
+  ========================= */
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex min-h-[500px] items-center justify-center">
+            <div className="flex flex-col items-center gap-3 text-stone-500">
+              <Loader2 className="h-8 w-8 animate-spin text-[#967438]" />
+
+              <p className="text-sm">
+                Loading Fatwa...
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!fatwa) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-red-600" />
+
+              <div>
+                <h2 className="font-semibold text-red-900">
+                  Fatwa not found
+                </h2>
+
+                <p className="mt-1 text-sm text-red-700">
+                  {error ||
+                    "The requested Fatwa could not be found."}
+                </p>
+
+                <Link
+                  href="/admin/fatwas"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Fatwas
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#faf9f6] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
-        {/* Header */}
+        {/* ================= HEADER ================= */}
+
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
@@ -219,18 +447,32 @@ export default function NewFatwaPage() {
 
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-                  Create Fatwa
+                  Manage Fatwa
                 </h1>
 
                 <p className="mt-1 text-sm text-stone-500">
-                  Add a new Islamic question and scholarly
-                  answer.
+                  Review and update this scholarly guidance.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting || saving}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+
+              Delete
+            </button>
+
             <Link
               href="/admin/fatwas"
               className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-stone-50"
@@ -241,34 +483,53 @@ export default function NewFatwaPage() {
             <button
               form="fatwa-form"
               type="submit"
-              disabled={submitting}
+              disabled={saving || deleting}
               className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? (
+              {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
               )}
 
-              {submitting
+              {saving
                 ? "Saving..."
-                : "Save Fatwa"}
+                : "Save Changes"}
             </button>
           </div>
         </div>
 
-        {/* Error */}
+        {/* ================= ERROR ================= */}
+
         {error && (
           <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div>
               <p className="text-sm font-semibold">
-                Unable to save Fatwa
+                Something went wrong
               </p>
 
               <p className="mt-1 text-sm">
                 {error}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ================= SUCCESS ================= */}
+
+        {success && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+            <Check className="mt-0.5 h-5 w-5 shrink-0" />
+
+            <div>
+              <p className="text-sm font-semibold">
+                Saved successfully
+              </p>
+
+              <p className="mt-1 text-sm">
+                {success}
               </p>
             </div>
           </div>
@@ -279,26 +540,8 @@ export default function NewFatwaPage() {
           onSubmit={handleSubmit}
           className="space-y-6"
         >
-          {/* Review Notice */}
-          <div className="flex gap-4 rounded-2xl border border-[#d6b56d]/40 bg-[#d6b56d]/10 p-5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d6b56d] text-stone-950">
-              <AlertCircle className="h-5 w-5" />
-            </div>
+          {/* ================= QUESTION ================= */}
 
-            <div>
-              <h2 className="text-sm font-semibold text-stone-900">
-                Scholar Review Required
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-stone-600">
-                Ensure the answer and references have been
-                reviewed and approved by a qualified scholar
-                before publishing.
-              </p>
-            </div>
-          </div>
-
-          {/* Question */}
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-stone-900">
@@ -307,13 +550,11 @@ export default function NewFatwaPage() {
               </h2>
 
               <p className="mt-1 text-sm text-stone-500">
-                Enter the question that needs Islamic
-                guidance.
+                Edit the Islamic question and its classification.
               </p>
             </div>
 
             <div className="space-y-5">
-              {/* Question */}
               <div>
                 <label
                   htmlFor="question"
@@ -324,21 +565,18 @@ export default function NewFatwaPage() {
 
                 <textarea
                   id="question"
-                  name="question"
-                  required
-                  minLength={10}
-                  maxLength={5000}
-                  rows={5}
                   value={question}
                   onChange={(e) =>
                     setQuestion(e.target.value)
                   }
-                  placeholder="e.g. What is the importance of establishing Salah?"
+                  required
+                  minLength={10}
+                  maxLength={5000}
+                  rows={6}
                   className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 />
               </div>
 
-              {/* Category + Scholar */}
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label
@@ -350,15 +588,14 @@ export default function NewFatwaPage() {
 
                   <select
                     id="category"
-                    name="category"
-                    required
                     value={category}
                     onChange={(e) =>
                       setCategory(e.target.value)
                     }
+                    required
                     className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                   >
-                    <option value="" disabled>
+                    <option value="">
                       Select category
                     </option>
 
@@ -378,24 +615,23 @@ export default function NewFatwaPage() {
                     htmlFor="scholar"
                     className="mb-2 block text-sm font-medium text-stone-800"
                   >
-                    Scholar
+                    Scholar / Teacher
                   </label>
 
                   <select
                     id="scholar"
-                    name="scholar"
-                    required
                     value={scholar}
                     onChange={(e) =>
                       setScholar(e.target.value)
                     }
+                    required
                     disabled={loadingScholars}
                     className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 disabled:cursor-not-allowed disabled:bg-stone-50"
                   >
-                    <option value="" disabled>
+                    <option value="">
                       {loadingScholars
-                        ? "Loading scholars..."
-                        : "Select scholar"}
+                        ? "Loading..."
+                        : "Select scholar / teacher"}
                     </option>
 
                     {scholars.map((item) => (
@@ -403,24 +639,17 @@ export default function NewFatwaPage() {
                         key={item._id}
                         value={item._id}
                       >
-                        {item.name}
+                        {item.name} — {item.role}
                       </option>
                     ))}
                   </select>
-
-                  {!loadingScholars &&
-                    scholars.length === 0 && (
-                      <p className="mt-2 text-xs text-amber-700">
-                        No active scholars found. Create or
-                        activate a scholar account first.
-                      </p>
-                    )}
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Answer */}
+          {/* ================= ANSWER ================= */}
+
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-stone-900">
@@ -428,12 +657,11 @@ export default function NewFatwaPage() {
               </h2>
 
               <p className="mt-1 text-sm text-stone-500">
-                Add the reviewed answer to the question.
+                Review and update the answer.
               </p>
             </div>
 
             <div className="space-y-5">
-              {/* Short Answer */}
               <div>
                 <label
                   htmlFor="shortAnswer"
@@ -444,18 +672,17 @@ export default function NewFatwaPage() {
 
                 <textarea
                   id="shortAnswer"
-                  name="shortAnswer"
-                  rows={4}
                   value={shortAnswer}
                   onChange={(e) =>
                     setShortAnswer(e.target.value)
                   }
+                  rows={4}
+                  maxLength={2000}
                   placeholder="Enter a concise answer..."
                   className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 />
               </div>
 
-              {/* Detailed Answer */}
               <div>
                 <label
                   htmlFor="answer"
@@ -466,29 +693,22 @@ export default function NewFatwaPage() {
 
                 <textarea
                   id="answer"
-                  name="answer"
-                  rows={10}
                   value={answer}
                   onChange={(e) =>
                     setAnswer(e.target.value)
                   }
-                  required={status === "Answered"}
+                  rows={12}
                   maxLength={10000}
-                  placeholder="Write the complete scholarly answer here..."
+                  required={status === "Answered"}
+                  placeholder="Write the complete scholarly answer..."
                   className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-7 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 />
-
-                {status === "Pending" && (
-                  <p className="mt-2 text-xs text-stone-500">
-                    Detailed answer can be added later while
-                    the Fatwa remains pending.
-                  </p>
-                )}
               </div>
             </div>
           </section>
 
-          {/* References */}
+          {/* ================= REFERENCES ================= */}
+
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-stone-900">
@@ -496,8 +716,8 @@ export default function NewFatwaPage() {
               </h2>
 
               <p className="mt-1 text-sm text-stone-500">
-                Add the Quran, Hadith, or scholarly references
-                supporting the answer.
+                Quran, Hadith and scholarly sources supporting
+                the answer.
               </p>
             </div>
 
@@ -532,13 +752,13 @@ export default function NewFatwaPage() {
 
                 <textarea
                   id="additionalReferences"
-                  rows={5}
                   value={additionalReferences}
                   onChange={(e) =>
                     setAdditionalReferences(
                       e.target.value
                     )
                   }
+                  rows={6}
                   placeholder="Add additional references, books, Hadith numbers, or scholarly sources..."
                   className="w-full resize-none rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                 />
@@ -546,7 +766,8 @@ export default function NewFatwaPage() {
             </div>
           </section>
 
-          {/* Publishing */}
+          {/* ================= PUBLISHING ================= */}
+
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-stone-900">
@@ -554,8 +775,7 @@ export default function NewFatwaPage() {
               </h2>
 
               <p className="mt-1 text-sm text-stone-500">
-                Control the review and public visibility of
-                this guidance.
+                Control the status and public visibility.
               </p>
             </div>
 
@@ -567,40 +787,46 @@ export default function NewFatwaPage() {
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {(["Pending", "Answered"] as const).map(
-                    (item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() =>
-                          setStatus(item)
-                        }
-                        className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
-                          status === item
-                            ? "border-[#d6b56d] bg-[#d6b56d]/10"
-                            : "border-stone-200 bg-white hover:border-stone-300"
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-stone-900">
-                            {item}
-                          </p>
+                  {statuses.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() =>
+                        setStatus(item)
+                      }
+                      className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
+                        status === item
+                          ? "border-[#d6b56d] bg-[#d6b56d]/10"
+                          : "border-stone-200 bg-white hover:border-stone-300"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-stone-900">
+                          {item}
+                        </p>
 
-                          <p className="mt-1 text-xs text-stone-500">
-                            {item === "Pending"
-                              ? "Keep this Fatwa under scholar review."
-                              : "Mark this Fatwa as answered."}
-                          </p>
+                        <p className="mt-1 text-xs text-stone-500">
+                          {item === "Pending" &&
+                            "Awaiting scholarly review."}
+
+                          {item === "Answered" &&
+                            "Question has a scholarly answer."}
+
+                          {item === "Rejected" &&
+                            "Question has been rejected."}
+
+                          {item === "Closed" &&
+                            "Fatwa is closed and no longer active."}
+                        </p>
+                      </div>
+
+                      {status === item && (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
+                          <Check className="h-4 w-4" />
                         </div>
-
-                        {status === item && (
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d6b56d] text-stone-950">
-                            <Check className="h-4 w-4" />
-                          </div>
-                        )}
-                      </button>
-                    )
-                  )}
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -612,7 +838,7 @@ export default function NewFatwaPage() {
                   </p>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Make this guidance visible on the public
+                    Make this Fatwa visible on the public
                     Fatwa page.
                   </p>
                 </div>
@@ -644,17 +870,35 @@ export default function NewFatwaPage() {
                 </button>
               </div>
 
-              {status === "Pending" && (
+              {status !== "Answered" && (
                 <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                  Publishing is available only after the
-                  Fatwa has been marked as Answered.
+                  Publishing is available only when the
+                  Fatwa status is Answered.
                 </p>
               )}
             </div>
           </section>
 
-          {/* Bottom Actions */}
+          {/* ================= BOTTOM ACTIONS ================= */}
+
           <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting || saving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-6 py-3 text-sm font-medium text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:mr-auto"
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+
+              {deleting
+                ? "Deleting..."
+                : "Delete Fatwa"}
+            </button>
+
             <Link
               href="/admin/fatwas"
               className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-6 py-3 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-stone-50"
@@ -664,18 +908,18 @@ export default function NewFatwaPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={saving || deleting}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? (
+              {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
               )}
 
-              {submitting
-                ? "Saving Fatwa..."
-                : "Save Fatwa"}
+              {saving
+                ? "Saving Changes..."
+                : "Save Changes"}
             </button>
           </div>
         </form>
