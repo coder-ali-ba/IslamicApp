@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
@@ -9,6 +10,7 @@ import {
   GraduationCap,
   Loader2,
   Save,
+  Trash2,
   Users,
   Video,
 } from "lucide-react";
@@ -27,9 +29,15 @@ type ClassCategory =
   | "Seerah"
   | "Islamic Studies";
 
-type ClassLevel = "Beginner" | "Intermediate" | "Advanced";
+type ClassLevel =
+  | "Beginner"
+  | "Intermediate"
+  | "Advanced";
 
-type ClassStatus = "Scheduled" | "Cancelled" | "Completed";
+type ClassStatus =
+  | "Scheduled"
+  | "Cancelled"
+  | "Completed";
 
 type Teacher = {
   _id: string;
@@ -38,6 +46,24 @@ type Teacher = {
   role: "teacher" | "scholar";
   isActive?: boolean;
   isVerified?: boolean;
+};
+
+type ClassData = {
+  _id?: string;
+  id?: string;
+  title: string;
+  description?: string;
+  category: ClassCategory;
+  level: ClassLevel;
+  teacher: Teacher | null;
+  scheduledAt: string;
+  durationMinutes: number;
+  maxStudents: number;
+  meetingUrl?: string;
+  status: ClassStatus;
+  students?: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /* ================================================================
@@ -52,13 +78,29 @@ const API_URL =
    PAGE
 ================================================================ */
 
-export default function NewClassPage() {
+export default function ManageClassPage() {
+  const params = useParams();
+  const router = useRouter();
+
+  const classId = Array.isArray(params.classId)
+    ? params.classId[0]
+    : params.classId;
+
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [classData, setClassData] = useState<ClassData | null>(
+    null
+  );
+
+  const [loading, setLoading] = useState(true);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [showDeleteConfirm, setShowDeleteConfirm] =
+    useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -75,14 +117,91 @@ export default function NewClassPage() {
   });
 
   /* ==============================================================
-     FETCH TEACHERS / SCHOLARS
+     FETCH CLASS
+  ============================================================== */
+
+  useEffect(() => {
+    if (!classId) return;
+
+    const fetchClass = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/classes/admin/${classId}`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data?.message || "Failed to fetch class"
+          );
+        }
+
+        const item: ClassData =
+          data.class || data.data || data;
+
+        if (!item) {
+          throw new Error("Class not found");
+        }
+
+        setClassData(item);
+
+        const scheduledDate = new Date(item.scheduledAt);
+
+        if (Number.isNaN(scheduledDate.getTime())) {
+          throw new Error(
+            "The class has an invalid scheduled date."
+          );
+        }
+
+        setForm({
+          title: item.title || "",
+          description: item.description || "",
+          category: item.category || "Quran",
+          level: item.level || "Beginner",
+          teacher: item.teacher?._id || "",
+          scheduledDate: formatInputDate(scheduledDate),
+          scheduledTime: formatInputTime(scheduledDate),
+          durationMinutes: String(
+            item.durationMinutes ?? 60
+          ),
+          maxStudents: String(
+            item.maxStudents ?? 20
+          ),
+          meetingUrl: item.meetingUrl || "",
+          status: item.status || "Scheduled",
+        });
+      } catch (error) {
+        console.error("Fetch admin class error:", error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch class"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClass();
+  }, [classId]);
+
+  /* ==============================================================
+     FETCH TEACHERS
   ============================================================== */
 
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
         setLoadingTeachers(true);
-        setError("");
 
         const response = await fetch(
           `${API_URL}/classes/admin/teachers`,
@@ -118,7 +237,7 @@ export default function NewClassPage() {
   }, []);
 
   /* ==============================================================
-     HANDLE INPUT
+     FORM CHANGE
   ============================================================== */
 
   const handleChange = (
@@ -130,28 +249,26 @@ export default function NewClassPage() {
       [field]: value,
     }));
 
-    if (error) {
-      setError("");
-    }
-
-    if (success) {
-      setSuccess("");
-    }
+    if (error) setError("");
+    if (success) setSuccess("");
   };
 
   /* ==============================================================
-     SUBMIT
+     SAVE CLASS
   ============================================================== */
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     setError("");
     setSuccess("");
 
-    /* ------------------------------------------------------------
-       CLIENT VALIDATION
-    ------------------------------------------------------------ */
+    if (!classId) {
+      setError("Class ID is missing.");
+      return;
+    }
 
     if (!form.title.trim()) {
       setError("Please enter a class title.");
@@ -159,12 +276,16 @@ export default function NewClassPage() {
     }
 
     if (form.title.trim().length < 3) {
-      setError("Class title must be at least 3 characters.");
+      setError(
+        "Class title must be at least 3 characters."
+      );
       return;
     }
 
     if (!form.teacher) {
-      setError("Please select a teacher or scholar.");
+      setError(
+        "Please select a teacher or scholar."
+      );
       return;
     }
 
@@ -203,10 +324,6 @@ export default function NewClassPage() {
       return;
     }
 
-    /* ------------------------------------------------------------
-       DATE + TIME
-    ------------------------------------------------------------ */
-
     const scheduledAt = new Date(
       `${form.scheduledDate}T${form.scheduledTime}`
     );
@@ -216,17 +333,13 @@ export default function NewClassPage() {
       return;
     }
 
-    /* ------------------------------------------------------------
-       SUBMIT
-    ------------------------------------------------------------ */
-
     try {
-      setSubmitting(true);
+      setSaving(true);
 
       const response = await fetch(
-        `${API_URL}/classes/admin`,
+        `${API_URL}/classes/admin/${classId}`,
         {
-          method: "POST",
+          method: "PUT",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
@@ -250,39 +363,154 @@ export default function NewClassPage() {
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to create class"
+          data?.message || "Failed to update class"
         );
       }
 
-      setSuccess("Class created successfully.");
+      const updatedClass: ClassData =
+        data.class || data.data || data;
 
-      /* Reset form */
+      setClassData(
+        updatedClass?.title
+          ? updatedClass
+          : {
+              ...classData,
+              title: form.title.trim(),
+              description: form.description.trim(),
+              category: form.category,
+              level: form.level,
+              scheduledAt:
+                scheduledAt.toISOString(),
+              durationMinutes: duration,
+              maxStudents,
+              meetingUrl: form.meetingUrl.trim(),
+              status: form.status,
+              teacher:
+                teachers.find(
+                  (teacher) =>
+                    teacher._id === form.teacher
+                ) || classData?.teacher || null,
+            }
+      );
 
-      setForm({
-        title: "",
-        description: "",
-        category: "Quran",
-        level: "Beginner",
-        teacher: "",
-        scheduledDate: "",
-        scheduledTime: "",
-        durationMinutes: "60",
-        maxStudents: "20",
-        meetingUrl: "",
-        status: "Scheduled",
-      });
+      setSuccess("Class updated successfully.");
     } catch (error) {
-      console.error("Create admin class error:", error);
+      console.error("Update admin class error:", error);
 
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to create class"
+          : "Failed to update class"
       );
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
+
+  /* ==============================================================
+     DELETE CLASS
+  ============================================================== */
+
+  const handleDelete = async () => {
+    if (!classId) {
+      setError("Class ID is missing.");
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/classes/admin/${classId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Failed to delete class"
+        );
+      }
+
+      router.push("/admin/classes");
+      router.refresh();
+    } catch (error) {
+      console.error("Delete admin class error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete class"
+      );
+
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  /* ==============================================================
+     LOADING
+  ============================================================== */
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6] p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex min-h-[500px] items-center justify-center rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#967438]" />
+
+              <p className="mt-4 text-sm text-stone-500">
+                Loading class...
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  /* ==============================================================
+     ERROR WITHOUT CLASS
+  ============================================================== */
+
+  if (!classData) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6] p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-5xl">
+          <Link
+            href="/admin/classes"
+            className="inline-flex items-center gap-2 text-sm font-medium text-stone-500 hover:text-stone-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Classes
+          </Link>
+
+          <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+            <h2 className="font-semibold text-red-800">
+              Unable to load class
+            </h2>
+
+            <p className="mt-2 text-sm text-red-600">
+              {error || "The requested class could not be found."}
+            </p>
+
+            <Link
+              href="/admin/classes"
+              className="mt-5 inline-flex rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white hover:bg-stone-800"
+            >
+              Back to Classes
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   /* ==============================================================
      RENDER
@@ -296,7 +524,7 @@ export default function NewClassPage() {
             HEADER
         ======================================================== */}
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Link
               href="/admin/classes"
@@ -311,13 +539,20 @@ export default function NewClassPage() {
             </p>
 
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-              Add New Class
+              Manage Class
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-              Create a new Islamic class and assign it to a
-              teacher or scholar.
+              Update the class information, schedule,
+              instructor, and enrollment settings.
             </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600">
+              {classData.students ?? 0} /{" "}
+              {classData.maxStudents} students
+            </span>
           </div>
         </div>
 
@@ -364,7 +599,7 @@ export default function NewClassPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Enter the main details of the class.
+                    Update the main details of the class.
                   </p>
                 </div>
               </div>
@@ -390,7 +625,6 @@ export default function NewClassPage() {
                   onChange={(e) =>
                     handleChange("title", e.target.value)
                   }
-                  placeholder="e.g. Quran Recitation & Tajweed"
                   maxLength={150}
                   required
                   className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
@@ -420,7 +654,6 @@ export default function NewClassPage() {
                       e.target.value
                     )
                   }
-                  placeholder="Describe what students will learn in this class..."
                   rows={4}
                   maxLength={2000}
                   className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
@@ -434,7 +667,6 @@ export default function NewClassPage() {
               {/* Category + Level */}
 
               <div className="grid gap-5 sm:grid-cols-2">
-
                 <div>
                   <label
                     htmlFor="category"
@@ -498,7 +730,6 @@ export default function NewClassPage() {
                     </option>
                   </select>
                 </div>
-
               </div>
             </div>
           </section>
@@ -520,7 +751,7 @@ export default function NewClassPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Assign the instructor and set the class schedule.
+                    Manage the instructor and class schedule.
                   </p>
                 </div>
               </div>
@@ -574,19 +805,11 @@ export default function NewClassPage() {
                     ))}
                   </select>
                 )}
-
-                {!loadingTeachers &&
-                  teachers.length === 0 && (
-                    <p className="mt-2 text-xs text-amber-600">
-                      No active teachers or scholars are available.
-                    </p>
-                  )}
               </div>
 
               {/* Date + Time */}
 
               <div className="grid gap-5 sm:grid-cols-2">
-
                 <div>
                   <label
                     htmlFor="scheduledDate"
@@ -642,13 +865,11 @@ export default function NewClassPage() {
                     />
                   </div>
                 </div>
-
               </div>
 
               {/* Duration + Capacity */}
 
               <div className="grid gap-5 sm:grid-cols-2">
-
                 <div>
                   <label
                     htmlFor="durationMinutes"
@@ -682,10 +903,6 @@ export default function NewClassPage() {
                       minutes
                     </span>
                   </div>
-
-                  <p className="mt-1.5 text-xs text-stone-400">
-                    15–240 minutes
-                  </p>
                 </div>
 
                 <div>
@@ -717,11 +934,13 @@ export default function NewClassPage() {
                     />
                   </div>
 
-                  <p className="mt-1.5 text-xs text-stone-400">
-                    Maximum 500 students
-                  </p>
+                  {typeof classData.students === "number" && (
+                    <p className="mt-1.5 text-xs text-stone-400">
+                      Currently enrolled:{" "}
+                      {classData.students}
+                    </p>
+                  )}
                 </div>
-
               </div>
             </div>
           </section>
@@ -743,15 +962,13 @@ export default function NewClassPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Add the meeting link students will use to join.
+                    Manage the class meeting information.
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-5 p-5 sm:p-6">
-
-              {/* Meeting URL */}
 
               <div>
                 <label
@@ -778,11 +995,6 @@ export default function NewClassPage() {
                     className="w-full rounded-xl border border-stone-200 bg-stone-50 py-3 pl-10 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                   />
                 </div>
-
-                <p className="mt-1.5 text-xs text-stone-400">
-                  Optional. Students can use this link to join the
-                  live class.
-                </p>
               </div>
 
               {/* Status */}
@@ -792,7 +1004,7 @@ export default function NewClassPage() {
                   htmlFor="status"
                   className="mb-2 block text-sm font-medium text-stone-700"
                 >
-                  Initial Status
+                  Status
                 </label>
 
                 <select
@@ -824,35 +1036,133 @@ export default function NewClassPage() {
               ACTIONS
           ====================================================== */}
 
-          <div className="flex flex-col-reverse gap-3 border-t border-stone-200 pt-6 sm:flex-row sm:justify-end">
-
-            <Link
-              href="/admin/classes"
-              className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
-            >
-              Cancel
-            </Link>
+          <div className="flex flex-col-reverse gap-3 border-t border-stone-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
 
             <button
-              type="submit"
-              disabled={submitting || loadingTeachers}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting || saving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating Class...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Create Class
-                </>
-              )}
+              <Trash2 className="h-4 w-4" />
+              Delete Class
             </button>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/admin/classes"
+                className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
+              >
+                Cancel
+              </Link>
+
+              <button
+                type="submit"
+                disabled={saving || deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving Changes...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>
+
+      {/* ==========================================================
+          DELETE CONFIRMATION
+      ========================================================== */}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <Trash2 className="h-5 w-5" />
+            </div>
+
+            <h2 className="mt-5 text-lg font-semibold text-stone-900">
+              Delete this class?
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-stone-500">
+              This will permanently delete{" "}
+              <span className="font-medium text-stone-800">
+                {classData.title}
+              </span>{" "}
+              and its associated enrollments. This action
+              cannot be undone.
+            </p>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() =>
+                  setShowDeleteConfirm(false)
+                }
+                disabled={deleting}
+                className="rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Delete Class
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
+}
+
+/* ================================================================
+   DATE HELPERS
+================================================================ */
+
+function formatInputDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatInputTime(date: Date) {
+  const hours = String(
+    date.getHours()
+  ).padStart(2, "0");
+
+  const minutes = String(
+    date.getMinutes()
+  ).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
 }
