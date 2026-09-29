@@ -50,18 +50,33 @@ type Teacher = {
 type ClassItem = {
   _id: string;
   id: string;
+
   title: string;
   description?: string;
+
   category: ClassCategory;
   level: ClassLevel;
+
   teacher: Teacher | null;
+
   scheduledAt: string;
+
   durationMinutes: number;
   duration: string;
+
   maxStudents: number;
+
   meetingUrl?: string;
+
+  // Dynamic class content
+  learningOutcomes?: string[];
+  topics?: string[];
+  requirements?: string[];
+
   status: ClassStatus;
+
   students: number;
+
   createdAt?: string;
   updatedAt?: string;
 };
@@ -141,7 +156,10 @@ export default function AdminClassesPage() {
 
       setClasses(data.classes || []);
     } catch (error) {
-      console.error("Fetch admin classes error:", error);
+      console.error(
+        "Fetch admin classes error:",
+        error
+      );
 
       setError(
         error instanceof Error
@@ -182,7 +200,7 @@ export default function AdminClassesPage() {
 
   const totalStudents = useMemo(() => {
     return classes.reduce(
-      (total, item) => total + item.students,
+      (total, item) => total + (item.students || 0),
       0
     );
   }, [classes]);
@@ -235,6 +253,34 @@ export default function AdminClassesPage() {
   };
 
   /* ==============================================================
+     CONTENT COUNTS
+  ============================================================== */
+
+  const getContentCount = (item: ClassItem) => {
+    const learningOutcomes = Array.isArray(
+      item.learningOutcomes
+    )
+      ? item.learningOutcomes.filter(Boolean).length
+      : 0;
+
+    const topics = Array.isArray(item.topics)
+      ? item.topics.filter(Boolean).length
+      : 0;
+
+    const requirements = Array.isArray(
+      item.requirements
+    )
+      ? item.requirements.filter(Boolean).length
+      : 0;
+
+    return {
+      learningOutcomes,
+      topics,
+      requirements,
+    };
+  };
+
+  /* ==============================================================
      RENDER
   ============================================================== */
 
@@ -274,6 +320,7 @@ export default function AdminClassesPage() {
                   refreshing ? "animate-spin" : ""
                 }`}
               />
+
               Refresh
             </button>
 
@@ -282,6 +329,7 @@ export default function AdminClassesPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800"
             >
               <Plus className="h-4 w-4" />
+
               Add Class
             </Link>
           </div>
@@ -370,12 +418,31 @@ export default function AdminClassesPage() {
               <option value="All">
                 All Categories
               </option>
-              <option value="Quran">Quran</option>
-              <option value="Tajweed">Tajweed</option>
-              <option value="Arabic">Arabic</option>
-              <option value="Hadith">Hadith</option>
-              <option value="Fiqh">Fiqh</option>
-              <option value="Seerah">Seerah</option>
+
+              <option value="Quran">
+                Quran
+              </option>
+
+              <option value="Tajweed">
+                Tajweed
+              </option>
+
+              <option value="Arabic">
+                Arabic
+              </option>
+
+              <option value="Hadith">
+                Hadith
+              </option>
+
+              <option value="Fiqh">
+                Fiqh
+              </option>
+
+              <option value="Seerah">
+                Seerah
+              </option>
+
               <option value="Islamic Studies">
                 Islamic Studies
               </option>
@@ -393,13 +460,19 @@ export default function AdminClassesPage() {
               <option value="All">
                 All Status
               </option>
-              <option value="Live">Live</option>
+
+              <option value="Live">
+                Live
+              </option>
+
               <option value="Upcoming">
                 Upcoming
               </option>
+
               <option value="Completed">
                 Completed
               </option>
+
               <option value="Cancelled">
                 Cancelled
               </option>
@@ -443,7 +516,7 @@ export default function AdminClassesPage() {
 
             <div className="mt-4 hidden overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm md:block">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px] text-left">
+                <table className="w-full min-w-[1180px] text-left">
                   <thead className="border-b border-stone-200 bg-stone-50">
                     <tr>
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-stone-500">
@@ -467,6 +540,10 @@ export default function AdminClassesPage() {
                       </th>
 
                       <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Details
+                      </th>
+
+                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-stone-500">
                         Status
                       </th>
 
@@ -477,100 +554,146 @@ export default function AdminClassesPage() {
                   </thead>
 
                   <tbody className="divide-y divide-stone-100">
-                    {classes.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="transition hover:bg-stone-50/70"
-                      >
-                        {/* Class */}
+                    {classes.map((item) => {
+                      const counts =
+                        getContentCount(item);
 
-                        <td className="px-6 py-5">
-                          <div>
-                            <p className="font-medium text-stone-900">
-                              {item.title}
-                            </p>
+                      return (
+                        <tr
+                          key={item.id}
+                          className="transition hover:bg-stone-50/70"
+                        >
+                          {/* Class */}
+
+                          <td className="px-6 py-5">
+                            <div>
+                              <p className="font-medium text-stone-900">
+                                {item.title}
+                              </p>
+
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-400">
+                                <GraduationCap className="h-3.5 w-3.5" />
+
+                                {item.level}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Teacher */}
+
+                          <td className="px-6 py-5">
+                            <div>
+                              <p className="text-sm font-medium text-stone-700">
+                                {item.teacher?.name ||
+                                  "Unassigned"}
+                              </p>
+
+                              {item.teacher?.email && (
+                                <p className="mt-1 text-xs text-stone-400">
+                                  {item.teacher.email}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Category */}
+
+                          <td className="px-6 py-5">
+                            <span className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
+                              {item.category}
+                            </span>
+                          </td>
+
+                          {/* Schedule */}
+
+                          <td className="px-6 py-5">
+                            <div className="text-sm text-stone-700">
+                              {formatDate(
+                                item.scheduledAt
+                              )}
+                            </div>
 
                             <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-400">
-                              <GraduationCap className="h-3.5 w-3.5" />
-                              {item.level}
+                              <Clock3 className="h-3.5 w-3.5" />
+
+                              {formatTime(
+                                item.scheduledAt
+                              )}
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Teacher */}
+                          {/* Students */}
 
-                        <td className="px-6 py-5">
-                          <div>
-                            <p className="text-sm font-medium text-stone-700">
-                              {item.teacher?.name ||
-                                "Unassigned"}
-                            </p>
+                          <td className="px-6 py-5">
+                            <div className="text-sm font-medium text-stone-700">
+                              {item.students || 0}
 
-                            {item.teacher?.email && (
-                              <p className="mt-1 text-xs text-stone-400">
-                                {item.teacher.email}
-                              </p>
-                            )}
-                          </div>
-                        </td>
+                              <span className="text-stone-400">
+                                {" "}
+                                / {item.maxStudents}
+                              </span>
+                            </div>
+                          </td>
 
-                        {/* Category */}
+                          {/* Details */}
 
-                        <td className="px-6 py-5">
-                          <span className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                            {item.category}
-                          </span>
-                        </td>
+                          <td className="px-6 py-5">
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-stone-700">
+                                  Outcomes
+                                </span>
 
-                        {/* Schedule */}
+                                <span className="rounded-md bg-stone-100 px-2 py-0.5 text-stone-500">
+                                  {
+                                    counts.learningOutcomes
+                                  }
+                                </span>
+                              </div>
 
-                        <td className="px-6 py-5">
-                          <div className="text-sm text-stone-700">
-                            {formatDate(
-                              item.scheduledAt
-                            )}
-                          </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-stone-700">
+                                  Topics
+                                </span>
 
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-400">
-                            <Clock3 className="h-3.5 w-3.5" />
-                            {formatTime(
-                              item.scheduledAt
-                            )}
-                          </div>
-                        </td>
+                                <span className="rounded-md bg-stone-100 px-2 py-0.5 text-stone-500">
+                                  {counts.topics}
+                                </span>
+                              </div>
 
-                        {/* Students */}
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-stone-700">
+                                  Requirements
+                                </span>
 
-                        <td className="px-6 py-5">
-                          <div className="text-sm font-medium text-stone-700">
-                            {item.students}
-                            <span className="text-stone-400">
-                              {" "}
-                              / {item.maxStudents}
-                            </span>
-                          </div>
-                        </td>
+                                <span className="rounded-md bg-stone-100 px-2 py-0.5 text-stone-500">
+                                  {counts.requirements}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
 
-                        {/* Status */}
+                          {/* Status */}
 
-                        <td className="px-6 py-5">
-                          <StatusBadge
-                            status={item.status}
-                          />
-                        </td>
+                          <td className="px-6 py-5">
+                            <StatusBadge
+                              status={item.status}
+                            />
+                          </td>
 
-                        {/* Action */}
+                          {/* Action */}
 
-                        <td className="px-6 py-5">
-                          <Link
-                            href={`/admin/classes/${item.id}`}
-                            className="text-sm font-medium text-[#967438] transition hover:text-stone-900"
-                          >
-                            Manage
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-6 py-5">
+                            <Link
+                              href={`/admin/classes/${item.id}`}
+                              className="text-sm font-medium text-[#967438] transition hover:text-stone-900"
+                            >
+                              Manage
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -581,80 +704,121 @@ export default function AdminClassesPage() {
             ==================================================== */}
 
             <div className="mt-4 space-y-4 md:hidden">
-              {classes.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="font-medium leading-6 text-stone-900">
-                        {item.title}
-                      </h2>
+              {classes.map((item) => {
+                const counts =
+                  getContentCount(item);
 
-                      <p className="mt-1 text-sm text-stone-500">
-                        {item.teacher?.name ||
-                          "Unassigned"}
-                      </p>
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="font-medium leading-6 text-stone-900">
+                          {item.title}
+                        </h2>
+
+                        <p className="mt-1 text-sm text-stone-500">
+                          {item.teacher?.name ||
+                            "Unassigned"}
+                        </p>
+                      </div>
+
+                      <StatusBadge
+                        status={item.status}
+                      />
                     </div>
 
-                    <StatusBadge
-                      status={item.status}
-                    />
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <InfoItem
+                        icon={
+                          <GraduationCap className="h-4 w-4" />
+                        }
+                        label="Level"
+                        value={item.level}
+                      />
+
+                      <InfoItem
+                        icon={
+                          <Users className="h-4 w-4" />
+                        }
+                        label="Students"
+                        value={`${item.students || 0} / ${item.maxStudents}`}
+                      />
+
+                      <InfoItem
+                        icon={
+                          <CalendarDays className="h-4 w-4" />
+                        }
+                        label="Date"
+                        value={formatDate(
+                          item.scheduledAt
+                        )}
+                      />
+
+                      <InfoItem
+                        icon={
+                          <Clock3 className="h-4 w-4" />
+                        }
+                        label="Time"
+                        value={formatTime(
+                          item.scheduledAt
+                        )}
+                      />
+                    </div>
+
+                    {/* Dynamic Content */}
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-stone-50 p-3 text-center">
+                        <p className="text-lg font-semibold text-stone-900">
+                          {
+                            counts.learningOutcomes
+                          }
+                        </p>
+
+                        <p className="mt-1 text-[11px] text-stone-400">
+                          Outcomes
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-stone-50 p-3 text-center">
+                        <p className="text-lg font-semibold text-stone-900">
+                          {counts.topics}
+                        </p>
+
+                        <p className="mt-1 text-[11px] text-stone-400">
+                          Topics
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-stone-50 p-3 text-center">
+                        <p className="text-lg font-semibold text-stone-900">
+                          {counts.requirements}
+                        </p>
+
+                        <p className="mt-1 text-[11px] text-stone-400">
+                          Requirements
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
+                      <span className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
+                        {item.category}
+                      </span>
+
+                      <Link
+                        href={`/admin/classes/${item.id}`}
+                        className="text-sm font-medium text-[#967438]"
+                      >
+                        Manage
+                      </Link>
+                    </div>
                   </div>
-
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <InfoItem
-                      icon={
-                        <GraduationCap className="h-4 w-4" />
-                      }
-                      label="Level"
-                      value={item.level}
-                    />
-
-                    <InfoItem
-                      icon={
-                        <Users className="h-4 w-4" />
-                      }
-                      label="Students"
-                      value={`${item.students} / ${item.maxStudents}`}
-                    />
-
-                    <InfoItem
-                      icon={
-                        <CalendarDays className="h-4 w-4" />
-                      }
-                      label="Date"
-                      value={formatDate(
-                        item.scheduledAt
-                      )}
-                    />
-
-                    <InfoItem
-                      icon={
-                        <Clock3 className="h-4 w-4" />
-                      }
-                      label="Time"
-                      value={formatTime(
-                        item.scheduledAt
-                      )}
-                    />
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
-                    <span className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                      {item.category}
-                    </span>
-
-                    <Link
-                      href={`/admin/classes/${item.id}`}
-                      className="text-sm font-medium text-[#967438]"
-                    >
-                      Manage
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* ====================================================
@@ -678,6 +842,7 @@ export default function AdminClassesPage() {
                   className="mt-5 inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
                 >
                   <Plus className="h-4 w-4" />
+
                   Add Class
                 </Link>
               </div>
@@ -738,6 +903,7 @@ function StatusBadge({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-900 px-3 py-1.5 text-xs font-medium text-[#d6b56d]">
         <span className="h-1.5 w-1.5 rounded-full bg-[#d6b56d]" />
+
         Live
       </span>
     );
@@ -747,6 +913,7 @@ function StatusBadge({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600">
         <span className="h-1.5 w-1.5 rounded-full bg-stone-500" />
+
         Completed
       </span>
     );
@@ -756,6 +923,7 @@ function StatusBadge({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600">
         <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+
         Cancelled
       </span>
     );
@@ -764,6 +932,7 @@ function StatusBadge({
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-600">
       <span className="h-1.5 w-1.5 rounded-full bg-stone-400" />
+
       Upcoming
     </span>
   );
@@ -786,6 +955,7 @@ function InfoItem({
     <div className="rounded-xl bg-stone-50 p-3">
       <div className="flex items-center gap-2 text-stone-400">
         {icon}
+
         <span className="text-xs">
           {label}
         </span>

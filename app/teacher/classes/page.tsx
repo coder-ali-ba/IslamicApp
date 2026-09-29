@@ -468,26 +468,13 @@ export default function TeacherClassesPage() {
                 {/* Actions */}
                 <div className="mt-5 flex items-center gap-2 border-t border-stone-100 pt-4">
                   {item.status === "Live" && (
-                    <>
-                      {item.meetingUrl ? (
-                        <a
-                          href={item.meetingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 rounded-xl bg-stone-900 px-4 py-2.5 text-center text-sm font-medium text-[#d6b56d] transition hover:bg-stone-800"
-                        >
-                          Join Class
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled
-                          className="flex-1 rounded-xl bg-stone-200 px-4 py-2.5 text-sm font-medium text-stone-400"
-                        >
-                          Meeting Not Set
-                        </button>
-                      )}
-                    </>
+                    <Link
+                      href={`/teacher/classes/${item._id}/live`}
+                      className="group flex flex-1 items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-center text-sm font-medium text-[#d6b56d] transition hover:bg-stone-800"
+                    >
+                      <Video className="h-4 w-4" />
+                      Start Live Class
+                    </Link>
                   )}
 
                   {item.status === "Upcoming" && (

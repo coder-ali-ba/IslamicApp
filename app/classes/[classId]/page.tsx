@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,97 +10,518 @@ import {
   CheckCircle2,
   Clock3,
   GraduationCap,
+  Loader2,
   Users,
   Video,
+  XCircle,
 } from "lucide-react";
 
-import { classes } from "@/app/src/lib/classes";
-import { classDetails } from "@/app/src/lib/class-details";
-import type { Metadata } from "next";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000/api";
 
 type ClassDetailsPageProps = {
   params: Promise<{
     classId: string;
   }>;
 };
-type Props = {
-  params: Promise<{
-    classId: string;
-  }>;
-};
-export async function generateMetadata({
-  params,
-}: Props): Promise<Metadata> {
-  const { classId } = await params;
 
-  const liveClass = classes.find((item) => item.id === classId);
+type ClassItem = {
+  id: string;
+  _id?: string;
 
-  if (!liveClass) {
-    return {
-      title: "Class Not Found",
-      description: "The requested Islamic class could not be found.",
-    };
-  }
+  title: string;
+  description: string;
+  category: string;
+  level: string;
 
-  return {
-    title: liveClass.title,
-    description: liveClass.description,
+  teacher?: {
+    _id?: string;
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
   };
+
+  instructor?: string;
+
+  scheduledAt: string;
+  durationMinutes: number;
+  duration: string;
+
+  maxStudents: number;
+  students: number;
+  seatsRemaining: number;
+
+  meetingUrl?: string;
+
+  learningOutcomes?: string[];
+  topics?: string[];
+  requirements?: string[];
+
+  status: "Upcoming" | "Live" | "Completed" | "Cancelled";
+
+  isEnrolled: boolean;
+  enrollmentStatus:
+    | "Registered"
+    | "Attended"
+    | "Cancelled"
+    | null;
+};
+
+type ClassResponse = {
+  success?: boolean;
+  message?: string;
+  class?: ClassItem;
+  data?: ClassItem;
+};
+
+type ActionResponse = {
+  success?: boolean;
+  message?: string;
+  class?: ClassItem;
+  data?: ClassItem;
+};
+
+function formatDate(dateString: string) {
+  if (!dateString) return "Date not available";
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(dateString));
 }
 
-export default async function ClassDetailsPage({
+function formatTime(dateString: string) {
+  if (!dateString) return "Time not available";
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(dateString));
+}
+
+export default function ClassDetailsPage({
   params,
 }: ClassDetailsPageProps) {
-  const { classId } = await params;
+  const [classId, setClassId] = useState<string | null>(
+    null
+  );
 
-  const classItem = classes.find((item) => item.id === classId);
+  const [classItem, setClassItem] =
+    useState<ClassItem | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] =
+    useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadParams() {
+      const resolvedParams = await params;
+
+      if (!mounted) return;
+
+      setClassId(resolvedParams.classId);
+    }
+
+    loadParams();
+
+    return () => {
+      mounted = false;
+    };
+  }, [params]);
+
+  useEffect(() => {
+    if (!classId) return;
+
+    let mounted = true;
+
+    async function loadClass() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_URL}/classes/${classId}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+        const result: ClassResponse =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.message ||
+              "Unable to load this class."
+          );
+        }
+
+        const loadedClass =
+          result.class || result.data;
+
+        if (!loadedClass) {
+          throw new Error(
+            "Class information was not found."
+          );
+        }
+
+        if (mounted) {
+          setClassItem(loadedClass);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load this class."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadClass();
+
+    return () => {
+      mounted = false;
+    };
+  }, [classId]);
+
+  const availableSeats = useMemo(() => {
+    if (!classItem) return 0;
+
+    if (
+      typeof classItem.seatsRemaining === "number"
+    ) {
+      return Math.max(
+        0,
+        classItem.seatsRemaining
+      );
+    }
+
+    return Math.max(
+      0,
+      classItem.maxStudents -
+        classItem.students
+    );
+  }, [classItem]);
+
+  const seatsPercentage = useMemo(() => {
+    if (
+      !classItem ||
+      classItem.maxStudents <= 0
+    ) {
+      return 0;
+    }
+
+    return Math.min(
+      100,
+      Math.max(
+        0,
+        (classItem.students /
+          classItem.maxStudents) *
+          100
+      )
+    );
+  }, [classItem]);
+
+  const handleEnroll = async () => {
+    if (!classId || !classItem) return;
+
+    try {
+      setActionLoading(true);
+      setActionMessage("");
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/classes/${classId}/enroll`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result: ActionResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            "Unable to enroll in this class."
+        );
+      }
+
+      const updatedClass =
+        result.class || result.data;
+
+      if (updatedClass) {
+        setClassItem(updatedClass);
+      } else {
+        const refreshResponse = await fetch(
+          `${API_URL}/classes/${classId}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+        const refreshResult: ClassResponse =
+          await refreshResponse.json();
+
+        if (refreshResponse.ok) {
+          const refreshedClass =
+            refreshResult.class ||
+            refreshResult.data;
+
+          if (refreshedClass) {
+            setClassItem(refreshedClass);
+          }
+        }
+      }
+
+      setActionMessage(
+        result.message ||
+          "You are now enrolled in this class."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to enroll in this class."
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelEnrollment = async () => {
+    if (!classId || !classItem) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel your enrollment in this class?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setActionLoading(true);
+      setActionMessage("");
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/classes/${classId}/cancel`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result: ActionResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            "Unable to cancel your enrollment."
+        );
+      }
+
+      const updatedClass =
+        result.class || result.data;
+
+      if (updatedClass) {
+        setClassItem(updatedClass);
+      } else {
+        const refreshResponse = await fetch(
+          `${API_URL}/classes/${classId}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+        const refreshResult: ClassResponse =
+          await refreshResponse.json();
+
+        if (refreshResponse.ok) {
+          const refreshedClass =
+            refreshResult.class ||
+            refreshResult.data;
+
+          if (refreshedClass) {
+            setClassItem(refreshedClass);
+          }
+        }
+      }
+
+      setActionMessage(
+        result.message ||
+          "Your enrollment has been cancelled."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to cancel your enrollment."
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6]">
+        <Navbar />
+
+        <div className="flex min-h-[70vh] items-center justify-center px-6">
+          <div className="text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#967438]" />
+
+            <p className="mt-4 text-sm text-stone-500">
+              Loading class...
+            </p>
+          </div>
+        </div>
+
+        <Footer />
+      </main>
+    );
+  }
+
+  if (error && !classItem) {
+    return (
+      <main className="min-h-screen bg-[#faf9f6]">
+        <Navbar />
+
+        <div className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center px-6">
+          <div className="w-full rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+              <XCircle className="h-7 w-7 text-red-600" />
+            </div>
+
+            <h1 className="mt-5 text-2xl font-semibold text-stone-900">
+              Unable to Load Class
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-stone-500">
+              {error}
+            </p>
+
+            <Link
+              href="/classes"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+            >
+              <ArrowLeft size={16} />
+              Back to Classes
+            </Link>
+          </div>
+        </div>
+
+        <Footer />
+      </main>
+    );
+  }
 
   if (!classItem) {
-    notFound();
+    return null;
   }
 
-  const details = classDetails[classItem.id];
+  const instructor =
+    classItem.instructor ||
+    classItem.teacher?.name ||
+    "Scholar";
 
-  if (!details) {
-    notFound();
-  }
+  const learningOutcomes =
+    Array.isArray(
+      classItem.learningOutcomes
+    )
+      ? classItem.learningOutcomes.filter(
+          Boolean
+        )
+      : [];
 
-  const availableSeats =
-    classItem.maxStudents - classItem.students;
+  const topics = Array.isArray(classItem.topics)
+    ? classItem.topics.filter(Boolean)
+    : [];
 
-  const seatsPercentage =
-    (classItem.students / classItem.maxStudents) * 100;
+  const requirements = Array.isArray(
+    classItem.requirements
+  )
+    ? classItem.requirements.filter(Boolean)
+    : [];
+
+  const isFull = availableSeats <= 0;
+
+  const isLive =
+    classItem.status === "Live";
+
+  const isUpcoming =
+    classItem.status === "Upcoming";
+
+  const isCompleted =
+    classItem.status === "Completed";
+
+  const isCancelled =
+    classItem.status === "Cancelled";
+
+  const isEnrolled =
+    classItem.enrollmentStatus ===
+      "Registered" ||
+    classItem.enrollmentStatus ===
+      "Attended";
+
+  const canCancel =
+    isEnrolled &&
+    isUpcoming &&
+    !actionLoading;
+
+  const canEnroll =
+    !isEnrolled &&
+    isUpcoming &&
+    !isFull &&
+    !actionLoading;
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">
       <Navbar />
+
       {/* Hero */}
       <section className="relative overflow-hidden bg-stone-900 text-white">
-        {/* Islamic pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.045]"
-          style={{
-            backgroundImage: `
-              linear-gradient(30deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
-              linear-gradient(150deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
-              linear-gradient(30deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d),
-              linear-gradient(150deg, #d6b56d 12%, transparent 12.5%, transparent 87%, #d6b56d 87.5%, #d6b56d)
-            `,
-            backgroundSize: "80px 140px",
-            backgroundPosition:
-              "0 0, 0 0, 40px 70px, 40px 70px",
-          }}
-        />
+        <div className="absolute inset-0 opacity-[0.045]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#d6b56d_1px,transparent_1px)] bg-[length:24px_24px]" />
+        </div>
 
         <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full border border-[#d6b56d]/10" />
         <div className="absolute -left-28 -top-28 h-56 w-56 rounded-full border border-[#d6b56d]/10" />
-
         <div className="absolute -right-40 bottom-[-160px] h-[420px] w-[420px] rounded-full border border-[#d6b56d]/10" />
 
         <div className="relative mx-auto max-w-7xl px-6 py-8 lg:px-8 lg:py-12">
-          {/* Back */}
           <Link
             href="/classes"
             className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-stone-300 transition hover:text-[#d6b56d]"
@@ -119,9 +542,19 @@ export default async function ClassDetailsPage({
                   {classItem.level}
                 </span>
 
-                <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-stone-300">
+                <span
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+                    isLive
+                      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                      : isCancelled
+                        ? "border-red-400/20 bg-red-500/10 text-red-300"
+                        : isCompleted
+                          ? "border-stone-400/20 bg-white/5 text-stone-400"
+                          : "border-white/10 bg-white/5 text-stone-300"
+                  }`}
+                >
                   <Video className="h-3.5 w-3.5" />
-                  Live Class
+                  {classItem.status}
                 </span>
               </div>
 
@@ -133,7 +566,6 @@ export default async function ClassDetailsPage({
                 {classItem.description}
               </p>
 
-              {/* Instructor */}
               <div className="mt-7 flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[#d6b56d]/20 bg-[#d6b56d]/10">
                   <GraduationCap className="h-5 w-5 text-[#d6b56d]" />
@@ -143,35 +575,49 @@ export default async function ClassDetailsPage({
                   <p className="text-xs text-stone-400">
                     Instructor
                   </p>
+
                   <p className="font-medium text-white">
-                    {classItem.instructor}
+                    {instructor}
                   </p>
                 </div>
               </div>
 
-              {/* Stats */}
               <div className="mt-8 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <CalendarDays className="mb-2 h-4 w-4 text-[#d6b56d]" />
-                  <p className="text-xs text-stone-400">Date</p>
+
+                  <p className="text-xs text-stone-400">
+                    Date
+                  </p>
+
                   <p className="mt-1 text-sm font-medium text-white">
-                    {classItem.date}
+                    {formatDate(
+                      classItem.scheduledAt
+                    )}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <Clock3 className="mb-2 h-4 w-4 text-[#d6b56d]" />
-                  <p className="text-xs text-stone-400">Time</p>
+
+                  <p className="text-xs text-stone-400">
+                    Time
+                  </p>
+
                   <p className="mt-1 text-sm font-medium text-white">
-                    {classItem.time}
+                    {formatTime(
+                      classItem.scheduledAt
+                    )}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <Clock3 className="mb-2 h-4 w-4 text-[#d6b56d]" />
+
                   <p className="text-xs text-stone-400">
                     Duration
                   </p>
+
                   <p className="mt-1 text-sm font-medium text-white">
                     {classItem.duration}
                   </p>
@@ -179,45 +625,71 @@ export default async function ClassDetailsPage({
 
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <Users className="mb-2 h-4 w-4 text-[#d6b56d]" />
-                  <p className="text-xs text-stone-400">Students</p>
+
+                  <p className="text-xs text-stone-400">
+                    Students
+                  </p>
+
                   <p className="mt-1 text-sm font-medium text-white">
-                    {classItem.students}/{classItem.maxStudents}
+                    {classItem.students}/
+                    {classItem.maxStudents}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Image */}
+            {/* Visual */}
             <div className="relative">
               <div className="absolute -inset-3 rounded-3xl border border-[#d6b56d]/10" />
 
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-stone-800 shadow-2xl">
-                <img
-                  src={classItem.image}
-                  alt={classItem.title}
-                  className="h-[360px] w-full object-cover sm:h-[420px]"
-                />
+              <div className="relative flex h-[360px] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-stone-800 via-stone-900 to-[#6d542d] shadow-2xl sm:h-[420px]">
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full border border-white/30" />
+                  <div className="absolute -bottom-16 -left-10 h-56 w-56 rounded-full border border-white/20" />
+                </div>
+
+                <div className="relative z-10 px-8 text-center">
+                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-[#d6b56d]/30 bg-[#d6b56d]/10">
+                    <BookOpen className="h-9 w-9 text-[#e4c98d]" />
+                  </div>
+
+                  <p className="mt-5 text-xs font-medium uppercase tracking-[0.22em] text-stone-400">
+                    IlmHub Live Class
+                  </p>
+
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    {classItem.category}
+                  </p>
+
+                  <p className="mt-2 text-sm text-stone-300">
+                    {classItem.level} Level
+                  </p>
+                </div>
 
                 <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-transparent to-transparent" />
 
                 <div className="absolute bottom-5 left-5 right-5">
                   <div className="rounded-2xl border border-white/10 bg-stone-950/70 p-4 backdrop-blur-md">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                       <div>
                         <p className="text-xs text-stone-400">
-                          Class Fee
+                          Availability
                         </p>
+
                         <p className="mt-1 text-2xl font-semibold text-[#e4c98d]">
-                          Rs {classItem.price.toLocaleString()}
+                          {isFull
+                            ? "Full"
+                            : `${availableSeats} seats`}
                         </p>
                       </div>
 
                       <div className="rounded-xl bg-white/10 px-3 py-2 text-right">
                         <p className="text-xs text-stone-400">
-                          Available
+                          Status
                         </p>
+
                         <p className="font-semibold text-white">
-                          {availableSeats} seats
+                          {classItem.status}
                         </p>
                       </div>
                     </div>
@@ -234,7 +706,7 @@ export default async function ClassDetailsPage({
         <div className="grid gap-10 lg:grid-cols-[1fr_380px]">
           {/* Left */}
           <div className="space-y-10">
-            {/* What you'll learn */}
+            {/* Learning Outcomes */}
             <section>
               <div className="mb-6">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#967438]">
@@ -246,20 +718,28 @@ export default async function ClassDetailsPage({
                 </h2>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {details.whatYouWillLearn.map((item) => (
-                  <div
-                    key={item}
-                    className="flex gap-3 rounded-2xl border border-stone-200 bg-white p-4"
-                  >
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#967438]" />
+              {learningOutcomes.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {learningOutcomes.map(
+                    (item, index) => (
+                      <div
+                        key={`${item}-${index}`}
+                        className="flex gap-3 rounded-2xl border border-stone-200 bg-white p-4"
+                      >
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#967438]" />
 
-                    <p className="text-sm leading-6 text-stone-700">
-                      {item}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                        <p className="text-sm leading-6 text-stone-700">
+                          {item}
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <EmptySection
+                  text="Learning outcomes for this class have not been added yet."
+                />
+              )}
             </section>
 
             {/* Topics */}
@@ -274,26 +754,35 @@ export default async function ClassDetailsPage({
                 </h2>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
-                {details.topics.map((topic, index) => (
-                  <div
-                    key={topic}
-                    className={`flex items-center gap-4 px-5 py-4 ${
-                      index !== details.topics.length - 1
-                        ? "border-b border-stone-100"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-xs font-semibold text-stone-600">
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
+              {topics.length > 0 ? (
+                <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+                  {topics.map((topic, index) => (
+                    <div
+                      key={`${topic}-${index}`}
+                      className={`flex items-center gap-4 px-5 py-4 ${
+                        index !== topics.length - 1
+                          ? "border-b border-stone-100"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-xs font-semibold text-stone-600">
+                        {String(index + 1).padStart(
+                          2,
+                          "0"
+                        )}
+                      </div>
 
-                    <p className="text-sm font-medium text-stone-700">
-                      {topic}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                      <p className="text-sm font-medium text-stone-700">
+                        {topic}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptySection
+                  text="Session topics for this class have not been added yet."
+                />
+              )}
             </section>
 
             {/* Requirements */}
@@ -308,40 +797,48 @@ export default async function ClassDetailsPage({
                 </h2>
               </div>
 
-              <div className="rounded-2xl border border-stone-200 bg-white p-6">
-                <div className="space-y-4">
-                  {details.requirements.map((requirement) => (
-                    <div
-                      key={requirement}
-                      className="flex items-start gap-3"
-                    >
-                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#b99a5a]" />
+              {requirements.length > 0 ? (
+                <div className="rounded-2xl border border-stone-200 bg-white p-6">
+                  <div className="space-y-4">
+                    {requirements.map(
+                      (requirement, index) => (
+                        <div
+                          key={`${requirement}-${index}`}
+                          className="flex items-start gap-3"
+                        >
+                          <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#b99a5a]" />
 
-                      <p className="text-sm leading-6 text-stone-600">
-                        {requirement}
-                      </p>
-                    </div>
-                  ))}
+                          <p className="text-sm leading-6 text-stone-600">
+                            {requirement}
+                          </p>
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <EmptySection
+                  text="No specific requirements have been added for this class."
+                />
+              )}
             </section>
           </div>
 
-          {/* Booking Card */}
+          {/* Enrollment Card */}
           <aside className="lg:sticky lg:top-24 lg:h-fit">
             <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
               <div className="border-b border-stone-100 p-6">
                 <p className="text-sm font-medium text-stone-500">
-                  Reserve Your Seat
+                  Class Enrollment
                 </p>
 
-                <div className="mt-2 flex items-end gap-2">
+                <div className="mt-2 flex items-center justify-between gap-4">
                   <span className="text-3xl font-semibold text-stone-900">
-                    Rs {classItem.price.toLocaleString()}
+                    {availableSeats}
                   </span>
 
-                  <span className="mb-1 text-sm text-stone-400">
-                    per class
+                  <span className="text-sm text-stone-400">
+                    seats remaining
                   </span>
                 </div>
               </div>
@@ -357,8 +854,11 @@ export default async function ClassDetailsPage({
                     <p className="text-xs text-stone-400">
                       Date
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-stone-800">
-                      {classItem.date}
+                      {formatDate(
+                        classItem.scheduledAt
+                      )}
                     </p>
                   </div>
                 </div>
@@ -373,8 +873,12 @@ export default async function ClassDetailsPage({
                     <p className="text-xs text-stone-400">
                       Time & Duration
                     </p>
+
                     <p className="mt-1 text-sm font-medium text-stone-800">
-                      {classItem.time} • {classItem.duration}
+                      {formatTime(
+                        classItem.scheduledAt
+                      )}{" "}
+                      • {classItem.duration}
                     </p>
                   </div>
                 </div>
@@ -387,7 +891,8 @@ export default async function ClassDetailsPage({
                     </span>
 
                     <span className="font-medium text-stone-800">
-                      {classItem.students}/{classItem.maxStudents}
+                      {classItem.students}/
+                      {classItem.maxStudents}
                     </span>
                   </div>
 
@@ -405,19 +910,133 @@ export default async function ClassDetailsPage({
                   </p>
                 </div>
 
-                {/* Booking button */}
-                <Link
-                  href="#booking"
-                  className="group flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-800"
-                >
-                  Book This Class
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
+                {/* Action message */}
+                {actionMessage && (
+                  <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
 
-                <p className="text-center text-xs leading-5 text-stone-400">
-                  Booking and payment will be available after account
-                  setup.
-                </p>
+                    <p className="text-xs leading-5 text-emerald-700">
+                      {actionMessage}
+                    </p>
+                  </div>
+                )}
+
+                {/* Error */}
+                {error && classItem && (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+
+                    <p className="text-xs leading-5 text-red-700">
+                      {error}
+                    </p>
+                  </div>
+                )}
+
+                {/* Enrolled */}
+                {isEnrolled && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-800">
+                          You are enrolled
+                        </p>
+
+                        <p className="mt-1 text-xs text-emerald-700">
+                          Your seat has been registered for this class.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Join Live Class */}
+                {isLive && isEnrolled && (
+                  <Link
+                    href={`/classes/${classId}/live`}
+                    className="group flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    <Video className="h-4 w-4" />
+
+                    Join Live Class
+
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                )}
+
+                {/* Enroll */}
+                {canEnroll && (
+                  <button
+                    type="button"
+                    onClick={handleEnroll}
+                    disabled={actionLoading}
+                    className="group flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {actionLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Enrolling...
+                      </>
+                    ) : (
+                      <>
+                        Enroll in This Class
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Cancel enrollment */}
+                {canCancel && (
+                  <button
+                    type="button"
+                    onClick={
+                      handleCancelEnrollment
+                    }
+                    disabled={actionLoading}
+                    className="w-full rounded-xl border border-stone-200 px-5 py-3 text-sm font-medium text-stone-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {actionLoading
+                      ? "Processing..."
+                      : "Cancel Enrollment"}
+                  </button>
+                )}
+
+                {/* Full */}
+                {isFull &&
+                  !isEnrolled &&
+                  isUpcoming && (
+                    <div className="rounded-xl bg-stone-100 px-5 py-3.5 text-center text-sm font-semibold text-stone-600">
+                      This class is currently full.
+                    </div>
+                  )}
+
+                {/* Completed */}
+                {isCompleted && (
+                  <div className="rounded-xl bg-stone-100 px-5 py-3.5 text-center text-sm font-semibold text-stone-600">
+                    This class has been completed.
+                  </div>
+                )}
+
+                {/* Cancelled */}
+                {isCancelled && (
+                  <div className="rounded-xl bg-red-50 px-5 py-3.5 text-center text-sm font-semibold text-red-600">
+                    This class has been cancelled.
+                  </div>
+                )}
+
+                {/* Upcoming note */}
+                {isUpcoming &&
+                  !isEnrolled &&
+                  !isFull && (
+                    <p className="text-center text-xs leading-5 text-stone-400">
+                      Enroll now to reserve your seat in this live
+                      Islamic learning session.
+                    </p>
+                  )}
 
                 {/* Info */}
                 <div className="rounded-2xl bg-stone-50 p-4">
@@ -431,7 +1050,8 @@ export default async function ClassDetailsPage({
 
                       <p className="mt-1 text-xs leading-5 text-stone-500">
                         Join the live session, interact with your
-                        instructor, and ask questions during the class.
+                        instructor, and ask questions during the
+                        class.
                       </p>
                     </div>
                   </div>
@@ -443,10 +1063,7 @@ export default async function ClassDetailsPage({
       </section>
 
       {/* Bottom CTA */}
-      <section
-        id="booking"
-        className="border-t border-stone-200 bg-white"
-      >
+      <section className="border-t border-stone-200 bg-white">
         <div className="mx-auto max-w-5xl px-6 py-14 text-center lg:px-8">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#967438]">
             Start Learning
@@ -470,7 +1087,22 @@ export default async function ClassDetailsPage({
           </Link>
         </div>
       </section>
+
       <Footer />
     </main>
+  );
+}
+
+function EmptySection({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-stone-200 bg-white p-6">
+      <p className="text-sm leading-6 text-stone-400">
+        {text}
+      </p>
+    </div>
   );
 }

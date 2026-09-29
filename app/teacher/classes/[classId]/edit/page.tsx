@@ -5,10 +5,14 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Loader2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000/api";
 
 type ClassData = {
   title: string;
@@ -19,6 +23,9 @@ type ClassData = {
   durationMinutes: number;
   maxStudents: number;
   meetingUrl: string;
+  learningOutcomes: string[];
+  topics: string[];
+  requirements: string[];
   status: "Scheduled" | "Cancelled" | "Completed";
 };
 
@@ -39,6 +46,7 @@ export default function EditTeacherClassPage() {
     const fetchClass = async () => {
       try {
         setLoading(true);
+        setError("");
 
         const response = await fetch(
           `${API_URL}/classes/teacher/my/${classId}`,
@@ -51,8 +59,7 @@ export default function EditTeacherClassPage() {
 
         if (!response.ok) {
           throw new Error(
-            data.message ||
-              "Failed to fetch class"
+            data?.message || "Failed to fetch class"
           );
         }
 
@@ -73,10 +80,28 @@ export default function EditTeacherClassPage() {
           category: item.category,
           level: item.level,
           scheduledAt: localDate,
-          durationMinutes:
-            item.durationMinutes,
+          durationMinutes: item.durationMinutes,
           maxStudents: item.maxStudents,
           meetingUrl: item.meetingUrl || "",
+
+          learningOutcomes:
+            Array.isArray(item.learningOutcomes) &&
+            item.learningOutcomes.length > 0
+              ? item.learningOutcomes
+              : [""],
+
+          topics:
+            Array.isArray(item.topics) &&
+            item.topics.length > 0
+              ? item.topics
+              : [""],
+
+          requirements:
+            Array.isArray(item.requirements) &&
+            item.requirements.length > 0
+              ? item.requirements
+              : [""],
+
           status:
             item.status === "Cancelled"
               ? "Cancelled"
@@ -105,6 +130,61 @@ export default function EditTeacherClassPage() {
     }
   }, [classId]);
 
+  const updateArrayItem = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements",
+    index: number,
+    value: string
+  ) => {
+    if (!form) return;
+
+    setForm({
+      ...form,
+      [field]: form[field].map(
+        (item, itemIndex) =>
+          itemIndex === index ? value : item
+      ),
+    });
+  };
+
+  const addArrayItem = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements"
+  ) => {
+    if (!form) return;
+
+    setForm({
+      ...form,
+      [field]: [...form[field], ""],
+    });
+  };
+
+  const removeArrayItem = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements",
+    index: number
+  ) => {
+    if (!form) return;
+
+    const updated = form[field].filter(
+      (_, itemIndex) => itemIndex !== index
+    );
+
+    setForm({
+      ...form,
+      [field]: updated.length ? updated : [""],
+    });
+  };
+
+  const cleanArray = (items: string[]) =>
+    items.map((item) => item.trim()).filter(Boolean);
+
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -125,11 +205,28 @@ export default function EditTeacherClassPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...form,
+            title: form.title,
+            description: form.description,
+            category: form.category,
+            level: form.level,
+            scheduledAt: form.scheduledAt,
             durationMinutes:
               Number(form.durationMinutes),
             maxStudents:
               Number(form.maxStudents),
+            meetingUrl: form.meetingUrl,
+
+            learningOutcomes: cleanArray(
+              form.learningOutcomes
+            ),
+
+            topics: cleanArray(form.topics),
+
+            requirements: cleanArray(
+              form.requirements
+            ),
+
+            status: form.status,
           }),
         }
       );
@@ -138,7 +235,7 @@ export default function EditTeacherClassPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
+          data?.message ||
             "Failed to update class"
         );
       }
@@ -181,7 +278,7 @@ export default function EditTeacherClassPage() {
     <div className="mx-auto max-w-3xl">
       <Link
         href="/teacher/classes"
-        className="inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900"
+        className="inline-flex items-center gap-2 text-sm text-stone-500 transition hover:text-stone-900"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Classes
@@ -239,7 +336,8 @@ export default function EditTeacherClassPage() {
                 })
               }
               rows={4}
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
+              placeholder="Describe what students will learn..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
             />
           </div>
 
@@ -297,8 +395,12 @@ export default function EditTeacherClassPage() {
                 })
               }
               required
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
             />
+
+            <p className="mt-1 text-xs text-stone-400">
+              Use your local Pakistan time.
+            </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -339,6 +441,78 @@ export default function EditTeacherClassPage() {
             />
           </div>
 
+          {/* Learning Outcomes */}
+          <ArrayField
+            label="Learning Outcomes"
+            description="What should students be able to understand or do after completing this class?"
+            items={form.learningOutcomes}
+            placeholder="e.g. Understand the basic principles of Tajweed"
+            onChange={(index, value) =>
+              updateArrayItem(
+                "learningOutcomes",
+                index,
+                value
+              )
+            }
+            onAdd={() =>
+              addArrayItem("learningOutcomes")
+            }
+            onRemove={(index) =>
+              removeArrayItem(
+                "learningOutcomes",
+                index
+              )
+            }
+          />
+
+          {/* Topics */}
+          <ArrayField
+            label="Topics Covered"
+            description="Add the main topics that will be taught in this class."
+            items={form.topics}
+            placeholder="e.g. Introduction to Quranic pronunciation"
+            onChange={(index, value) =>
+              updateArrayItem(
+                "topics",
+                index,
+                value
+              )
+            }
+            onAdd={() =>
+              addArrayItem("topics")
+            }
+            onRemove={(index) =>
+              removeArrayItem(
+                "topics",
+                index
+              )
+            }
+          />
+
+          {/* Requirements */}
+          <ArrayField
+            label="Requirements"
+            description="Mention anything students should have or know before joining."
+            items={form.requirements}
+            placeholder="e.g. Basic knowledge of Arabic letters"
+            onChange={(index, value) =>
+              updateArrayItem(
+                "requirements",
+                index,
+                value
+              )
+            }
+            onAdd={() =>
+              addArrayItem("requirements")
+            }
+            onRemove={(index) =>
+              removeArrayItem(
+                "requirements",
+                index
+              )
+            }
+          />
+
           <Input
             label="Meeting URL"
             type="url"
@@ -362,11 +536,12 @@ export default function EditTeacherClassPage() {
               onChange={(event) =>
                 setForm({
                   ...form,
-                  status: event.target
-                    .value as ClassData["status"],
+                  status:
+                    event.target
+                      .value as ClassData["status"],
                 })
               }
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
             >
               <option value="Scheduled">
                 Scheduled
@@ -385,7 +560,7 @@ export default function EditTeacherClassPage() {
           <div className="flex justify-end gap-3 border-t border-stone-100 pt-5">
             <Link
               href="/teacher/classes"
-              className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
             >
               Cancel
             </Link>
@@ -393,7 +568,7 @@ export default function EditTeacherClassPage() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving && (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -406,6 +581,93 @@ export default function EditTeacherClassPage() {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function ArrayField({
+  label,
+  description,
+  items,
+  placeholder,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  description: string;
+  items: string[];
+  placeholder: string;
+  onChange: (
+    index: number,
+    value: string
+  ) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
+      <div className="mb-3">
+        <label className="block text-sm font-semibold text-stone-800">
+          {label}
+        </label>
+
+        <p className="mt-1 text-xs leading-5 text-stone-400">
+          {description}
+        </p>
+      </div>
+
+      <div className="space-y-2.5">
+        {items.map((item, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-2"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white text-xs font-semibold text-[#967438]">
+              {index + 1}
+            </div>
+
+            <input
+              type="text"
+              value={item}
+              onChange={(event) =>
+                onChange(
+                  index,
+                  event.target.value
+                )
+              }
+              placeholder={placeholder}
+              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+            />
+
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              disabled={items.length === 1}
+              aria-label={`Remove ${label} ${
+                index + 1
+              }`}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onAdd}
+        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-[#d6b56d] hover:text-[#967438]"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add{" "}
+        {label === "Topics Covered"
+          ? "Topic"
+          : label === "Learning Outcomes"
+            ? "Outcome"
+            : "Requirement"}
+      </button>
     </div>
   );
 }
@@ -445,7 +707,7 @@ function Input({
         required={required}
         min={min}
         max={max}
-        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
+        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
       />
     </div>
   );
@@ -473,10 +735,13 @@ function Select({
         onChange={(event) =>
           onChange(event.target.value)
         }
-        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
+        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm outline-none transition focus:border-[#d6b56d] focus:bg-white focus:ring-2 focus:ring-[#d6b56d]/20"
       >
         {options.map((option) => (
-          <option key={option} value={option}>
+          <option
+            key={option}
+            value={option}
+          >
             {option}
           </option>
         ))}
@@ -484,3 +749,4 @@ function Select({
     </div>
   );
 }
+

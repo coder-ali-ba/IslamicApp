@@ -9,6 +9,7 @@ import {
   Clock3,
   GraduationCap,
   Loader2,
+  Plus,
   Save,
   Trash2,
   Users,
@@ -62,6 +63,11 @@ type ClassData = {
   meetingUrl?: string;
   status: ClassStatus;
   students?: number;
+
+  learningOutcomes?: string[];
+  topics?: string[];
+  requirements?: string[];
+
   createdAt?: string;
   updatedAt?: string;
 };
@@ -87,12 +93,13 @@ export default function ManageClassPage() {
     : params.classId;
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [classData, setClassData] = useState<ClassData | null>(
-    null
-  );
+  const [classData, setClassData] =
+    useState<ClassData | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [loadingTeachers, setLoadingTeachers] =
+    useState(true);
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -114,6 +121,10 @@ export default function ManageClassPage() {
     maxStudents: "20",
     meetingUrl: "",
     status: "Scheduled" as ClassStatus,
+
+    learningOutcomes: [""],
+    topics: [""],
+    requirements: [""],
   });
 
   /* ==============================================================
@@ -153,9 +164,15 @@ export default function ManageClassPage() {
 
         setClassData(item);
 
-        const scheduledDate = new Date(item.scheduledAt);
+        const scheduledDate = new Date(
+          item.scheduledAt
+        );
 
-        if (Number.isNaN(scheduledDate.getTime())) {
+        if (
+          Number.isNaN(
+            scheduledDate.getTime()
+          )
+        ) {
           throw new Error(
             "The class has an invalid scheduled date."
           );
@@ -167,19 +184,54 @@ export default function ManageClassPage() {
           category: item.category || "Quran",
           level: item.level || "Beginner",
           teacher: item.teacher?._id || "",
-          scheduledDate: formatInputDate(scheduledDate),
-          scheduledTime: formatInputTime(scheduledDate),
+
+          scheduledDate:
+            formatInputDate(scheduledDate),
+
+          scheduledTime:
+            formatInputTime(scheduledDate),
+
           durationMinutes: String(
             item.durationMinutes ?? 60
           ),
+
           maxStudents: String(
             item.maxStudents ?? 20
           ),
-          meetingUrl: item.meetingUrl || "",
-          status: item.status || "Scheduled",
+
+          meetingUrl:
+            item.meetingUrl || "",
+
+          status:
+            item.status || "Scheduled",
+
+          learningOutcomes:
+            Array.isArray(
+              item.learningOutcomes
+            ) &&
+            item.learningOutcomes.length > 0
+              ? item.learningOutcomes
+              : [""],
+
+          topics:
+            Array.isArray(item.topics) &&
+            item.topics.length > 0
+              ? item.topics
+              : [""],
+
+          requirements:
+            Array.isArray(
+              item.requirements
+            ) &&
+            item.requirements.length > 0
+              ? item.requirements
+              : [""],
         });
       } catch (error) {
-        console.error("Fetch admin class error:", error);
+        console.error(
+          "Fetch admin class error:",
+          error
+        );
 
         setError(
           error instanceof Error
@@ -215,13 +267,17 @@ export default function ManageClassPage() {
 
         if (!response.ok) {
           throw new Error(
-            data?.message || "Failed to load teachers"
+            data?.message ||
+              "Failed to load teachers"
           );
         }
 
         setTeachers(data.teachers || []);
       } catch (error) {
-        console.error("Fetch class teachers error:", error);
+        console.error(
+          "Fetch class teachers error:",
+          error
+        );
 
         setError(
           error instanceof Error
@@ -254,6 +310,83 @@ export default function ManageClassPage() {
   };
 
   /* ==============================================================
+     ARRAY CHANGE
+  ============================================================== */
+
+  const handleArrayChange = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements",
+    index: number,
+    value: string
+  ) => {
+    setForm((previous) => {
+      const updated = [...previous[field]];
+
+      updated[index] = value;
+
+      return {
+        ...previous,
+        [field]: updated,
+      };
+    });
+
+    if (error) setError("");
+    if (success) setSuccess("");
+  };
+
+  const addArrayItem = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements"
+  ) => {
+    setForm((previous) => ({
+      ...previous,
+      [field]: [
+        ...previous[field],
+        "",
+      ],
+    }));
+  };
+
+  const removeArrayItem = (
+    field:
+      | "learningOutcomes"
+      | "topics"
+      | "requirements",
+    index: number
+  ) => {
+    setForm((previous) => {
+      const updated = previous[field].filter(
+        (_, itemIndex) =>
+          itemIndex !== index
+      );
+
+      return {
+        ...previous,
+        [field]:
+          updated.length > 0
+            ? updated
+            : [""],
+      };
+    });
+  };
+
+  /* ==============================================================
+     CLEAN ARRAY
+  ============================================================== */
+
+  const cleanArray = (
+    items: string[]
+  ) => {
+    return items
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+
+  /* ==============================================================
      SAVE CLASS
   ============================================================== */
 
@@ -271,7 +404,9 @@ export default function ManageClassPage() {
     }
 
     if (!form.title.trim()) {
-      setError("Please enter a class title.");
+      setError(
+        "Please enter a class title."
+      );
       return;
     }
 
@@ -290,17 +425,26 @@ export default function ManageClassPage() {
     }
 
     if (!form.scheduledDate) {
-      setError("Please select a class date.");
+      setError(
+        "Please select a class date."
+      );
       return;
     }
 
     if (!form.scheduledTime) {
-      setError("Please select a class time.");
+      setError(
+        "Please select a class time."
+      );
       return;
     }
 
-    const duration = Number(form.durationMinutes);
-    const maxStudents = Number(form.maxStudents);
+    const duration = Number(
+      form.durationMinutes
+    );
+
+    const maxStudents = Number(
+      form.maxStudents
+    );
 
     if (
       !Number.isFinite(duration) ||
@@ -328,10 +472,29 @@ export default function ManageClassPage() {
       `${form.scheduledDate}T${form.scheduledTime}`
     );
 
-    if (Number.isNaN(scheduledAt.getTime())) {
-      setError("Please enter a valid date and time.");
+    if (
+      Number.isNaN(
+        scheduledAt.getTime()
+      )
+    ) {
+      setError(
+        "Please enter a valid date and time."
+      );
       return;
     }
+
+    const learningOutcomes =
+      cleanArray(
+        form.learningOutcomes
+      );
+
+    const topics =
+      cleanArray(form.topics);
+
+    const requirements =
+      cleanArray(
+        form.requirements
+      );
 
     try {
       setSaving(true);
@@ -342,60 +505,113 @@ export default function ManageClassPage() {
           method: "PUT",
           credentials: "include",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
             title: form.title.trim(),
-            description: form.description.trim(),
+
+            description:
+              form.description.trim(),
+
             category: form.category,
+
             level: form.level,
+
             teacher: form.teacher,
-            scheduledAt: scheduledAt.toISOString(),
+
+            scheduledAt:
+              scheduledAt.toISOString(),
+
             durationMinutes: duration,
+
             maxStudents,
-            meetingUrl: form.meetingUrl.trim(),
+
+            meetingUrl:
+              form.meetingUrl.trim(),
+
             status: form.status,
+
+            learningOutcomes,
+
+            topics,
+
+            requirements,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to update class"
+          data?.message ||
+            "Failed to update class"
         );
       }
 
       const updatedClass: ClassData =
-        data.class || data.data || data;
+        data.class ||
+        data.data ||
+        data;
 
       setClassData(
         updatedClass?.title
           ? updatedClass
           : {
               ...classData,
-              title: form.title.trim(),
-              description: form.description.trim(),
-              category: form.category,
-              level: form.level,
+              title:
+                form.title.trim(),
+
+              description:
+                form.description.trim(),
+
+              category:
+                form.category,
+
+              level:
+                form.level,
+
               scheduledAt:
                 scheduledAt.toISOString(),
-              durationMinutes: duration,
+
+              durationMinutes:
+                duration,
+
               maxStudents,
-              meetingUrl: form.meetingUrl.trim(),
-              status: form.status,
+
+              meetingUrl:
+                form.meetingUrl.trim(),
+
+              status:
+                form.status,
+
+              learningOutcomes,
+
+              topics,
+
+              requirements,
+
               teacher:
                 teachers.find(
                   (teacher) =>
-                    teacher._id === form.teacher
-                ) || classData?.teacher || null,
+                    teacher._id ===
+                    form.teacher
+                ) ||
+                classData?.teacher ||
+                null,
             }
       );
 
-      setSuccess("Class updated successfully.");
+      setSuccess(
+        "Class updated successfully."
+      );
     } catch (error) {
-      console.error("Update admin class error:", error);
+      console.error(
+        "Update admin class error:",
+        error
+      );
 
       setError(
         error instanceof Error
@@ -429,18 +645,23 @@ export default function ManageClassPage() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to delete class"
+          data?.message ||
+            "Failed to delete class"
         );
       }
 
       router.push("/admin/classes");
       router.refresh();
     } catch (error) {
-      console.error("Delete admin class error:", error);
+      console.error(
+        "Delete admin class error:",
+        error
+      );
 
       setError(
         error instanceof Error
@@ -497,7 +718,8 @@ export default function ManageClassPage() {
             </h2>
 
             <p className="mt-2 text-sm text-red-600">
-              {error || "The requested class could not be found."}
+              {error ||
+                "The requested class could not be found."}
             </p>
 
             <Link
@@ -543,7 +765,8 @@ export default function ManageClassPage() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-              Update the class information, schedule,
+              Update the class information,
+              learning content, schedule,
               instructor, and enrollment settings.
             </p>
           </div>
@@ -599,7 +822,8 @@ export default function ManageClassPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Update the main details of the class.
+                    Update the main details of
+                    the class.
                   </p>
                 </div>
               </div>
@@ -615,7 +839,9 @@ export default function ManageClassPage() {
                   className="mb-2 block text-sm font-medium text-stone-700"
                 >
                   Class Title
-                  <span className="ml-1 text-red-500">*</span>
+                  <span className="ml-1 text-red-500">
+                    *
+                  </span>
                 </label>
 
                 <input
@@ -623,7 +849,10 @@ export default function ManageClassPage() {
                   type="text"
                   value={form.title}
                   onChange={(e) =>
-                    handleChange("title", e.target.value)
+                    handleChange(
+                      "title",
+                      e.target.value
+                    )
                   }
                   maxLength={150}
                   required
@@ -631,7 +860,8 @@ export default function ManageClassPage() {
                 />
 
                 <p className="mt-1.5 text-xs text-stone-400">
-                  {form.title.length}/150 characters
+                  {form.title.length}/150
+                  characters
                 </p>
               </div>
 
@@ -660,20 +890,24 @@ export default function ManageClassPage() {
                 />
 
                 <p className="mt-1.5 text-xs text-stone-400">
-                  {form.description.length}/2000 characters
+                  {form.description.length}
+                  /2000 characters
                 </p>
               </div>
 
               {/* Category + Level */}
 
               <div className="grid gap-5 sm:grid-cols-2">
+
                 <div>
                   <label
                     htmlFor="category"
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Category
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <select
@@ -687,12 +921,30 @@ export default function ManageClassPage() {
                     }
                     className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 outline-none transition focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
                   >
-                    <option value="Quran">Quran</option>
-                    <option value="Tajweed">Tajweed</option>
-                    <option value="Arabic">Arabic</option>
-                    <option value="Hadith">Hadith</option>
-                    <option value="Fiqh">Fiqh</option>
-                    <option value="Seerah">Seerah</option>
+                    <option value="Quran">
+                      Quran
+                    </option>
+
+                    <option value="Tajweed">
+                      Tajweed
+                    </option>
+
+                    <option value="Arabic">
+                      Arabic
+                    </option>
+
+                    <option value="Hadith">
+                      Hadith
+                    </option>
+
+                    <option value="Fiqh">
+                      Fiqh
+                    </option>
+
+                    <option value="Seerah">
+                      Seerah
+                    </option>
+
                     <option value="Islamic Studies">
                       Islamic Studies
                     </option>
@@ -705,7 +957,9 @@ export default function ManageClassPage() {
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Level
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <select
@@ -722,15 +976,139 @@ export default function ManageClassPage() {
                     <option value="Beginner">
                       Beginner
                     </option>
+
                     <option value="Intermediate">
                       Intermediate
                     </option>
+
                     <option value="Advanced">
                       Advanced
                     </option>
                   </select>
                 </div>
+
               </div>
+            </div>
+          </section>
+
+          {/* ======================================================
+              LEARNING CONTENT
+          ====================================================== */}
+
+          <section className="rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="border-b border-stone-100 px-5 py-5 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-900 text-[#d6b56d]">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold text-stone-900">
+                    Learning Content
+                  </h2>
+
+                  <p className="mt-1 text-xs text-stone-500">
+                    Update what students will learn,
+                    study, and prepare for.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-8 p-5 sm:p-6">
+
+              {/* Learning Outcomes */}
+
+              <DynamicList
+                title="Learning Outcomes"
+                description="What should students be able to understand or achieve after completing this class?"
+                items={
+                  form.learningOutcomes
+                }
+                placeholder="e.g. Understand the basic rules of Tajweed"
+                onChange={(
+                  index,
+                  value
+                ) =>
+                  handleArrayChange(
+                    "learningOutcomes",
+                    index,
+                    value
+                  )
+                }
+                onAdd={() =>
+                  addArrayItem(
+                    "learningOutcomes"
+                  )
+                }
+                onRemove={(index) =>
+                  removeArrayItem(
+                    "learningOutcomes",
+                    index
+                  )
+                }
+              />
+
+              {/* Topics */}
+
+              <DynamicList
+                title="Topics Covered"
+                description="List the main topics that will be covered during the class."
+                items={form.topics}
+                placeholder="e.g. Introduction to Tajweed rules"
+                onChange={(
+                  index,
+                  value
+                ) =>
+                  handleArrayChange(
+                    "topics",
+                    index,
+                    value
+                  )
+                }
+                onAdd={() =>
+                  addArrayItem("topics")
+                }
+                onRemove={(index) =>
+                  removeArrayItem(
+                    "topics",
+                    index
+                  )
+                }
+              />
+
+              {/* Requirements */}
+
+              <DynamicList
+                title="Requirements"
+                description="Tell students what they need before joining or attending this class."
+                items={
+                  form.requirements
+                }
+                placeholder="e.g. Bring a Quran and notebook"
+                onChange={(
+                  index,
+                  value
+                ) =>
+                  handleArrayChange(
+                    "requirements",
+                    index,
+                    value
+                  )
+                }
+                onAdd={() =>
+                  addArrayItem(
+                    "requirements"
+                  )
+                }
+                onRemove={(index) =>
+                  removeArrayItem(
+                    "requirements",
+                    index
+                  )
+                }
+              />
+
             </div>
           </section>
 
@@ -751,7 +1129,8 @@ export default function ManageClassPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-stone-500">
-                    Manage the instructor and class schedule.
+                    Manage the instructor and class
+                    schedule.
                   </p>
                 </div>
               </div>
@@ -767,7 +1146,9 @@ export default function ManageClassPage() {
                   className="mb-2 block text-sm font-medium text-stone-700"
                 >
                   Teacher / Scholar
-                  <span className="ml-1 text-red-500">*</span>
+                  <span className="ml-1 text-red-500">
+                    *
+                  </span>
                 </label>
 
                 {loadingTeachers ? (
@@ -792,17 +1173,22 @@ export default function ManageClassPage() {
                       Select teacher or scholar
                     </option>
 
-                    {teachers.map((teacher) => (
-                      <option
-                        key={teacher._id}
-                        value={teacher._id}
-                      >
-                        {teacher.name} —{" "}
-                        {teacher.role === "scholar"
-                          ? "Scholar"
-                          : "Teacher"}
-                      </option>
-                    ))}
+                    {teachers.map(
+                      (teacher) => (
+                        <option
+                          key={teacher._id}
+                          value={
+                            teacher._id
+                          }
+                        >
+                          {teacher.name} —{" "}
+                          {teacher.role ===
+                          "scholar"
+                            ? "Scholar"
+                            : "Teacher"}
+                        </option>
+                      )
+                    )}
                   </select>
                 )}
               </div>
@@ -810,13 +1196,16 @@ export default function ManageClassPage() {
               {/* Date + Time */}
 
               <div className="grid gap-5 sm:grid-cols-2">
+
                 <div>
                   <label
                     htmlFor="scheduledDate"
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Class Date
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <div className="relative">
@@ -825,7 +1214,9 @@ export default function ManageClassPage() {
                     <input
                       id="scheduledDate"
                       type="date"
-                      value={form.scheduledDate}
+                      value={
+                        form.scheduledDate
+                      }
                       onChange={(e) =>
                         handleChange(
                           "scheduledDate",
@@ -844,7 +1235,9 @@ export default function ManageClassPage() {
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Start Time
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <div className="relative">
@@ -853,7 +1246,9 @@ export default function ManageClassPage() {
                     <input
                       id="scheduledTime"
                       type="time"
-                      value={form.scheduledTime}
+                      value={
+                        form.scheduledTime
+                      }
                       onChange={(e) =>
                         handleChange(
                           "scheduledTime",
@@ -865,18 +1260,22 @@ export default function ManageClassPage() {
                     />
                   </div>
                 </div>
+
               </div>
 
               {/* Duration + Capacity */}
 
               <div className="grid gap-5 sm:grid-cols-2">
+
                 <div>
                   <label
                     htmlFor="durationMinutes"
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Duration
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <div className="relative">
@@ -888,7 +1287,9 @@ export default function ManageClassPage() {
                       min={15}
                       max={240}
                       step={15}
-                      value={form.durationMinutes}
+                      value={
+                        form.durationMinutes
+                      }
                       onChange={(e) =>
                         handleChange(
                           "durationMinutes",
@@ -903,6 +1304,10 @@ export default function ManageClassPage() {
                       minutes
                     </span>
                   </div>
+
+                  <p className="mt-1.5 text-xs text-stone-400">
+                    15–240 minutes
+                  </p>
                 </div>
 
                 <div>
@@ -911,7 +1316,9 @@ export default function ManageClassPage() {
                     className="mb-2 block text-sm font-medium text-stone-700"
                   >
                     Maximum Students
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <div className="relative">
@@ -922,7 +1329,9 @@ export default function ManageClassPage() {
                       type="number"
                       min={1}
                       max={500}
-                      value={form.maxStudents}
+                      value={
+                        form.maxStudents
+                      }
                       onChange={(e) =>
                         handleChange(
                           "maxStudents",
@@ -934,13 +1343,15 @@ export default function ManageClassPage() {
                     />
                   </div>
 
-                  {typeof classData.students === "number" && (
+                  {typeof classData.students ===
+                    "number" && (
                     <p className="mt-1.5 text-xs text-stone-400">
                       Currently enrolled:{" "}
                       {classData.students}
                     </p>
                   )}
                 </div>
+
               </div>
             </div>
           </section>
@@ -970,6 +1381,8 @@ export default function ManageClassPage() {
 
             <div className="grid gap-5 p-5 sm:p-6">
 
+              {/* Meeting URL */}
+
               <div>
                 <label
                   htmlFor="meetingUrl"
@@ -984,7 +1397,9 @@ export default function ManageClassPage() {
                   <input
                     id="meetingUrl"
                     type="url"
-                    value={form.meetingUrl}
+                    value={
+                      form.meetingUrl
+                    }
                     onChange={(e) =>
                       handleChange(
                         "meetingUrl",
@@ -1021,14 +1436,17 @@ export default function ManageClassPage() {
                   <option value="Scheduled">
                     Scheduled
                   </option>
+
                   <option value="Cancelled">
                     Cancelled
                   </option>
+
                   <option value="Completed">
                     Completed
                   </option>
                 </select>
               </div>
+
             </div>
           </section>
 
@@ -1040,8 +1458,14 @@ export default function ManageClassPage() {
 
             <button
               type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={deleting || saving}
+              onClick={() =>
+                setShowDeleteConfirm(
+                  true
+                )
+              }
+              disabled={
+                deleting || saving
+              }
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
@@ -1049,6 +1473,7 @@ export default function ManageClassPage() {
             </button>
 
             <div className="flex flex-col gap-3 sm:flex-row">
+
               <Link
                 href="/admin/classes"
                 className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-50"
@@ -1058,7 +1483,9 @@ export default function ManageClassPage() {
 
               <button
                 type="submit"
-                disabled={saving || deleting}
+                disabled={
+                  saving || deleting
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? (
@@ -1073,8 +1500,10 @@ export default function ManageClassPage() {
                   </>
                 )}
               </button>
+
             </div>
           </div>
+
         </form>
       </div>
 
@@ -1099,15 +1528,18 @@ export default function ManageClassPage() {
               <span className="font-medium text-stone-800">
                 {classData.title}
               </span>{" "}
-              and its associated enrollments. This action
-              cannot be undone.
+              and its associated enrollments.
+              This action cannot be undone.
             </p>
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+
               <button
                 type="button"
                 onClick={() =>
-                  setShowDeleteConfirm(false)
+                  setShowDeleteConfirm(
+                    false
+                  )
                 }
                 disabled={deleting}
                 className="rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50"
@@ -1133,6 +1565,7 @@ export default function ManageClassPage() {
                   </>
                 )}
               </button>
+
             </div>
           </div>
         </div>
@@ -1142,20 +1575,119 @@ export default function ManageClassPage() {
 }
 
 /* ================================================================
+   DYNAMIC LIST COMPONENT
+================================================================ */
+
+function DynamicList({
+  title,
+  description,
+  items,
+  placeholder,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  description: string;
+  items: string[];
+  placeholder: string;
+  onChange: (
+    index: number,
+    value: string
+  ) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-stone-900">
+          {title}
+        </h3>
+
+        <p className="mt-1 text-xs leading-5 text-stone-500">
+          {description}
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {items.map(
+          (item, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-sm font-semibold text-stone-500">
+                {index + 1}
+              </div>
+
+              <input
+                type="text"
+                value={item}
+                onChange={(e) =>
+                  onChange(
+                    index,
+                    e.target.value
+                  )
+                }
+                placeholder={placeholder}
+                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  onRemove(index)
+                }
+                disabled={
+                  items.length === 1
+                }
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Remove ${title} item`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onAdd}
+        className="mt-3 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+      >
+        <Plus className="h-4 w-4 text-[#967438]" />
+        Add {title}
+      </button>
+    </div>
+  );
+}
+
+/* ================================================================
    DATE HELPERS
 ================================================================ */
 
-function formatInputDate(date: Date) {
-  const year = date.getFullYear();
+function formatInputDate(
+  date: Date
+) {
+  const year =
+    date.getFullYear();
+
   const month = String(
     date.getMonth() + 1
   ).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
 
-function formatInputTime(date: Date) {
+function formatInputTime(
+  date: Date
+) {
   const hours = String(
     date.getHours()
   ).padStart(2, "0");

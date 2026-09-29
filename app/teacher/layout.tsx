@@ -50,6 +50,11 @@ const menuItems = [
     href: "/teacher/messages",
     icon: MessageSquare,
   },
+  {
+    name: "Questions",
+    href: "/teacher/questions",
+    icon: MessageSquare
+  }
 ];
 
 const accountItems = [
