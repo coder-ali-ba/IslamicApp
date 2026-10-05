@@ -21,7 +21,7 @@ const navLinks = [
   { name: "Courses", href: "/courses" },
   { name: "Fatwa", href: "/fatwa" },
   { name: "Classes", href: "/classes" },
-  { name: "Teachers", href: "/teachers" },
+ 
 ];
 
 export default function Navbar() {

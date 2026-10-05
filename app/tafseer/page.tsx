@@ -1,6 +1,6 @@
 import { quranClient } from "@/app/src/lib/quran";
 import { surahs } from "@/app/src/lib/surah";
-
+import type { ChapterId } from "@quranjs/api";
 import TafseerControls from "@/app/components/tafseer/TafseerControll";
 import TafseerAyahCard from "@/app/components/tafseer/TafseerAyahCard";
 import { Metadata } from "next";
@@ -122,41 +122,43 @@ export default async function TafseerPage({ searchParams }: Props) {
    * Get verses + Tafseer
    */
 
-  const allVerses: any[] = [];
+const allVerses: Awaited<
+  ReturnType<typeof quranClient.content.v4.verses.byChapter>
+> = [];
 
-  let page = 1;
-  let hasMore = true;
+const chapterId = selectedSurah as ChapterId;
 
-  while (hasMore) {
-    const response = await quranClient.content.v4.verses.byChapter(
-      String(selectedSurah),
-      {
-        words: true,
+let page = 1;
+let hasMore = true;
 
-        wordFields: {
-          textUthmani: true,
-        },
+while (hasMore) {
+  const verses = await quranClient.content.v4.verses.byChapter(
+    chapterId,
+    {
+      words: true,
 
-        tafsirs: [selectedTafseer],
-
-        page,
-
-        perPage: 50,
+      wordFields: {
+        textUthmani: true,
       },
-    );
 
-    const verses = Array.isArray(response)
-      ? response
-      : (response?.verses ?? []);
+      tafsirs: [selectedTafseer],
 
-    allVerses.push(...verses);
-
-    if (allVerses.length >= surah.verses || verses.length === 0) {
-      hasMore = false;
-    } else {
-      page++;
+      page,
+      perPage: 50,
     }
+  );
+
+  allVerses.push(...verses);
+
+  if (
+    allVerses.length >= surah.verses ||
+    verses.length === 0
+  ) {
+    hasMore = false;
+  } else {
+    page++;
   }
+}
 
   return (
     <main className="min-h-screen bg-[#faf9f6]">

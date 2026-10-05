@@ -329,7 +329,7 @@ export default function TeacherLiveClassroomPage({
           console.log("Consumer transport closed:", consumer.id);
         });
 
-        consumer.on("producerclose", () => {
+        consumer.on("trackended", () => {
           removeRemoteParticipant(producer.peerId);
         });
       } catch (consumeError) {

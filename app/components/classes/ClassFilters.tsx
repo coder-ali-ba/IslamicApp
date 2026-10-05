@@ -23,6 +23,8 @@ const categories: Array<ClassCategory | "All"> = [
   "Arabic",
   "Hadith",
   "Fiqh",
+  "Seerah",
+  "Islamic Studies",
 ];
 
 const levels: Array<ClassLevel | "All"> = [

@@ -5,6 +5,7 @@ import QuranReaderControls from "@/app/components/quran/QuranReaderControls";
 import { surahs } from "@/app/src/lib/surah";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
+import type { ChapterId } from "@quranjs/api";
 
 type Props = {
   params: Promise<{
@@ -23,7 +24,24 @@ export default async function SurahPage({
   const { surahId } = await params;
   const query = await searchParams;
 
-  const id = Number(surahId);
+  const id = Number(surahId) 
+  if (!Number.isInteger(id) || id < 1 || id > 114) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#faf9f6]">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold text-stone-900">
+          Invalid Surah
+        </h1>
+
+        <p className="mt-2 text-sm text-stone-500">
+          The requested Surah number is invalid.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+const chapterId = id as ChapterId;
 
   const surah = surahs.find((item) => item.id === id);
 
@@ -82,7 +100,7 @@ export default async function SurahPage({
   while (hasMore) {
     const response =
       await quranClient.content.v4.verses.byChapter(
-        surahId,
+        chapterId,
         {
           words: true,
 
@@ -101,8 +119,8 @@ export default async function SurahPage({
       );
 
     const verses = Array.isArray(response)
-      ? response
-      : response?.verses ?? [];
+  ? response
+  : (response as { verses?: any[] })?.verses ?? [];
 
     allVerses.push(...verses);
 

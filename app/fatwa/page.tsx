@@ -11,11 +11,14 @@ import FatwaCard from "../components/fatwa/FatwaCard";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-import { fatwaCategories, type FatwaCategory } from "@/app/src/lib/fatwa";
+import { fatwaCategories, type Fatwa, type FatwaCategory } from "@/app/src/lib/fatwa";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-
+type FatwaScholar = {
+  _id?: string;
+  name?: string;
+  role?: string;
+};
 
 type ApiFatwa = {
   _id: string;
@@ -32,15 +35,14 @@ type ApiFatwa = {
 
 type UiFatwa = {
   id: string;
+  slug: string;
   question: string;
   shortAnswer: string;
   answer: string;
   category: FatwaCategory;
-  scholar?: string | null;
-  primaryReference: string;
-  additionalReferences: string;
-  slug: string;
-  createdAt: string;
+  scholar: string;
+  date: string;
+  reference: string;
   featured: boolean;
 };
 
@@ -49,7 +51,7 @@ export default function FatwaPage() {
     FatwaCategory | "All"
   >("All");
 
-  const [fatwas, setFatwas] = useState<UiFatwa[]>([]);
+  const [fatwas, setFatwas] = useState<Fatwa[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -91,25 +93,23 @@ export default function FatwaPage() {
         Array.isArray(data.fatwas) ? data.fatwas : []
       ).map((fatwa: ApiFatwa, index: number) => ({
         id: fatwa._id,
+        slug: fatwa.slug,
         question: fatwa.question,
         shortAnswer: fatwa.shortAnswer || fatwa.answer || "",
         answer: fatwa.answer || "",
         category: fatwa.category,
 
-        // IMPORTANT:
-        // Existing FatwaCard expects scholar as text,
-        // while backend returns { _id, name, role }.
         scholar:
           typeof fatwa.scholar === "object" && fatwa.scholar !== null
             ? fatwa.scholar.name || "Scholar"
-            : null,
+            : fatwa.scholar || "Scholar",
 
-        primaryReference: fatwa.primaryReference || "",
+        date: fatwa.createdAt,
 
-        additionalReferences: fatwa.additionalReferences || "",
-
-        slug: fatwa.slug,
-        createdAt: fatwa.createdAt,
+        reference:
+          [fatwa.primaryReference, fatwa.additionalReferences]
+            .filter(Boolean)
+            .join(" • ") || "Islamic Sources",
 
         featured: index < 3,
       }));

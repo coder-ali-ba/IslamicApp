@@ -1,9 +1,12 @@
 export type ClassCategory =
+  | "All"
   | "Quran"
   | "Tajweed"
   | "Arabic"
   | "Hadith"
-  | "Fiqh";
+  | "Fiqh"
+  | "Seerah"
+  | "Islamic Studies";
 
 export type ClassLevel =
   | "Beginner"

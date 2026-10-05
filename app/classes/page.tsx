@@ -13,6 +13,7 @@ const API_URL =
   "http://localhost:5000/api";
 
 type ClassCategory =
+  | "All"
   | "Quran"
   | "Tajweed"
   | "Hadith"

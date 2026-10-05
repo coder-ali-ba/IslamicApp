@@ -137,20 +137,7 @@ export default function Footer() {
                 </Link>
               </li>
 
-              <li>
-                <Link
-                  href="/teachers"
-                  className="transition hover:text-[#d6b56d]"
-                >
-                  Teachers
-                </Link>
-              </li>
-
-              <li>
-                <Link href="/blog" className="transition hover:text-[#d6b56d]">
-                  Articles
-                </Link>
-              </li>
+              
 
               <li>
                 <Link href="/about" className="transition hover:text-[#d6b56d]">
@@ -216,22 +203,7 @@ export default function Footer() {
           </Link>
         </div>
 
-        {/* Bottom */}
-        <div className="mt-8 flex flex-col gap-3 border-t border-stone-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-stone-500">
-            © {new Date().getFullYear()} IlmHub. All rights reserved.
-          </p>
-
-          <div className="flex gap-4 text-xs text-stone-500">
-            <Link href="/privacy" className="hover:text-[#d6b56d]">
-              Privacy
-            </Link>
-
-            <Link href="/terms" className="hover:text-[#d6b56d]">
-              Terms
-            </Link>
-          </div>
-        </div>
+        
       </div>
     </footer>
   );
