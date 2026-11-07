@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import Link from "next/link";
-// import api from "../src/lib/api";
+import api from "../src/lib/api";
 
 type Instructor = {
   _id?: string;
@@ -35,7 +35,7 @@ type Lesson = {
   videoUrl?: string;
 };
 
-const API_URL =`${process.env.NEXT_PUBLIC_API_URL}/api`
+const API_URL =process.env.NEXT_PUBLIC_API_URL;
 
 
 // Apne lesson.routes.js ke mutabiq zarurat par ye path change karein.

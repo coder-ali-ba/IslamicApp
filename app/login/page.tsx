@@ -4,7 +4,6 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Mail, ArrowRight } from "lucide-react";
 import api from "../src/lib/api";
-import axios from "axios";
 
 
 export default function LoginPage() {
@@ -28,8 +27,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
-     {
+      const response = await api.post("/auth/login", {
         email,
         password,
       });

@@ -13,7 +13,7 @@ import Footer from "../components/Footer";
 
 import { fatwaCategories, type Fatwa, type FatwaCategory } from "@/app/src/lib/fatwa";
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api` || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 type FatwaScholar = {
   _id?: string;
   name?: string;
