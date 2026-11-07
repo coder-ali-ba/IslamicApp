@@ -47,7 +47,7 @@ export default function AdminCoursesPage() {
         setError("");
 
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/courses/admin`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/courses/admin`,
           {
             credentials: "include",
           },

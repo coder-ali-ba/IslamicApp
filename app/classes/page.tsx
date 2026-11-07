@@ -8,8 +8,9 @@ import ClassCard from "@/app/components/classes/ClassCard";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
+
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
+  `${process.env.NEXT_PUBLIC_API_URL}/api` ||
   "http://localhost:5000/api";
 
 type ClassCategory =
@@ -130,6 +131,8 @@ export default function ClassesPage() {
       );
 
       const data = await response.json();
+      console.log(data);
+      
 
       if (!response.ok) {
         throw new Error(

@@ -14,7 +14,7 @@ import {
 import { fatwaCategories } from "@/app/src/lib/fatwa";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
+  `${process.env.NEXT_PUBLIC_API_URL}/api` ||
   "http://localhost:5000/api";
 
 type Teacher = {

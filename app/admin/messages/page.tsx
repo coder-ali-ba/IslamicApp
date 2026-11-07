@@ -84,7 +84,7 @@ type CreateMessageResponse = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+  `${process.env.NEXT_PUBLIC_API_URL}/api` || "http://localhost:5000/api";
 
 export default function AdminMessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
