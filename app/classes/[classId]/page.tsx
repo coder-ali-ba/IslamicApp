@@ -154,7 +154,7 @@ export default function ClassDetailsPage({
         setError("");
 
         const response = await fetch(
-          `${API_URL}/classes/${classId}`,
+          `${API_URL}/api/classes/${classId}`,
           {
             method: "GET",
             credentials: "include",

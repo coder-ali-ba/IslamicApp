@@ -67,7 +67,7 @@ export default function MyClassesPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_URL}/classes/my`, {
+      const response = await fetch(`${API_URL}/api/classes/my`, {
         method: "GET",
         credentials: "include",
         headers: {

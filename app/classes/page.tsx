@@ -123,7 +123,7 @@ export default function ClassesPage() {
       setError("");
 
       const response = await fetch(
-        `${API_URL}/classes`,
+        `${API_URL}/api/classes`,
         {
           method: "GET",
           credentials: "include",
