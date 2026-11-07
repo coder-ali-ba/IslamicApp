@@ -66,7 +66,7 @@ export default function AskFatwaForm() {
         setLoadingTeachers(true);
 
         const response = await fetch(
-          `${API_URL}/questions/teachers`,
+          `${API_URL}/api/questions/teachers`,
           {
             method: "GET",
             credentials: "include",

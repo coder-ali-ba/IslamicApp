@@ -137,7 +137,7 @@ export default function AdminClassesPage() {
       const queryString = params.toString();
 
       const response = await fetch(
-        `${API_URL}/classes/admin${
+        `${API_URL}/api/classes/admin${
           queryString ? `?${queryString}` : ""
         }`,
         {

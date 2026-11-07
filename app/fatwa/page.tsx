@@ -76,7 +76,7 @@ export default function FatwaPage() {
       const queryString = params.toString();
 
       const response = await fetch(
-        `${API_URL}/fatwas${queryString ? `?${queryString}` : ""}`,
+        `${API_URL}/api/fatwas${queryString ? `?${queryString}` : ""}`,
         {
           method: "GET",
           cache: "no-store",
