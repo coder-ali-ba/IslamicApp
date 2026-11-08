@@ -86,9 +86,9 @@ export default function CoursesPage() {
 
     try {
       const [coursesResponse, enrollmentsResponse] = await Promise.all([
-        api.get("/courses", { withCredentials: true }),
+        api.get("/api/courses", { withCredentials: true }),
         api
-          .get("/enrollments/my", { withCredentials: true })
+          .get("/api/enrollments/my", { withCredentials: true })
           .catch(() => null),
       ]);
 
