@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search,
   Plus,
-  MoreHorizontal,
   BookOpen,
   Users,
   Clock3,
@@ -13,7 +12,12 @@ import {
   SlidersHorizontal,
   Pencil,
   Trash2,
+  RefreshCw,
+  AlertCircle,
+  GraduationCap,
 } from "lucide-react";
+
+type CourseStatus = "Published" | "Draft";
 
 type AdminCourse = {
   id: string;
@@ -25,129 +29,287 @@ type AdminCourse = {
   lessons: number;
   duration: string;
   price: number;
-  status: "Published" | "Draft";
+  status: CourseStatus;
 };
+
+type ApiCourse = {
+  _id?: string;
+  id?: string;
+  title?: string;
+  name?: string;
+  category?: string;
+  level?: string;
+  instructor?: { name?: string } | string | null;
+  students?: number;
+  enrolledStudents?: number;
+  enrollments?: unknown[];
+  lessons?: number | unknown[];
+  modules?: unknown[];
+  duration?: string | number;
+  price?: number;
+  status?: string;
+  isPublished?: boolean;
+};
+
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"
+)
+  .trim()
+  .replace(/\/+$/, "");
+
+function apiUrl(path: string) {
+  const cleanPath = path.replace(/^\/+/, "");
+  const baseHasApiSuffix = /\/api$/i.test(API_BASE);
+
+  return `${API_BASE}${baseHasApiSuffix ? "" : "/api"}/${cleanPath}`;
+}
+
+function numberValue(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function countValue(value: unknown, fallback?: unknown): number {
+  if (Array.isArray(value)) return value.length;
+
+  if (value !== undefined && value !== null && value !== "") {
+    return numberValue(value);
+  }
+
+  if (Array.isArray(fallback)) return fallback.length;
+
+  return numberValue(fallback);
+}
+
+function normalizeStatus(course: ApiCourse): CourseStatus {
+  if (course.isPublished === true) return "Published";
+
+  const status = String(course.status || "").toLowerCase();
+
+  return status === "published" || status === "active"
+    ? "Published"
+    : "Draft";
+}
+
+function normalizeCourse(course: ApiCourse): AdminCourse {
+  const instructor =
+    typeof course.instructor === "string"
+      ? course.instructor
+      : course.instructor?.name;
+
+  return {
+    id: String(course._id || course.id || ""),
+    title: course.title || course.name || "Untitled course",
+    category: course.category || "Uncategorized",
+    level: course.level || "All levels",
+    instructor: instructor || "No Instructor",
+    students: countValue(
+      course.students,
+      course.enrolledStudents ?? course.enrollments
+    ),
+    lessons: countValue(course.lessons, course.modules),
+    duration:
+      course.duration === undefined ||
+      course.duration === null ||
+      course.duration === ""
+        ? "N/A"
+        : String(course.duration),
+    price: numberValue(course.price),
+    status: normalizeStatus(course),
+  };
+}
+
+async function readApiResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
 
 export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<AdminCourse[]>([]);
-
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [level, setLevel] = useState("All");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Fetch all courses for admin
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/courses/admin`,
-          {
-            credentials: "include",
-          },
+    try {
+      const response = await fetch(apiUrl("courses/admin"), {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            `Failed to fetch courses (${response.status})`
         );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Failed to fetch courses");
-        }
-
-        const formattedCourses: AdminCourse[] = (data.courses || []).map(
-          (course: any) => ({
-            id: course._id,
-            title: course.title,
-            category: course.category,
-            level: course.level,
-            instructor: course.instructor?.name || "No Instructor",
-            students: course.students ?? 0,
-            lessons: course.lessons ?? 0,
-            duration: course.duration || "N/A",
-            price: course.price ?? 0,
-            status: course.status,
-          }),
-        );
-
-        setCourses(formattedCourses);
-      } catch (error) {
-        console.error("Fetch Admin Courses Error:", error);
-
-        setError(
-          error instanceof Error ? error.message : "Failed to load courses",
-        );
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchCourses();
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.courses)
+          ? data.courses
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.data?.courses)
+              ? data.data.courses
+              : [];
+
+      const formattedCourses = list
+        .map((course: ApiCourse) => normalizeCourse(course))
+        .filter((course: AdminCourse) => course.id);
+
+      setCourses(formattedCourses);
+    } catch (err) {
+      console.error("Fetch Admin Courses Error:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load courses. Please check your API connection."
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void fetchCourses();
+  }, [fetchCourses]);
+
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          courses
+            .map((course) => course.category)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [courses]
+  );
+
+  const levels = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          courses.map((course) => course.level).filter(Boolean)
+        )
+      ).sort(),
+    [courses]
+  );
+
   const filteredCourses = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
     return courses.filter((course) => {
       const matchesSearch =
-        course.title.toLowerCase().includes(search.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(search.toLowerCase());
+        !term ||
+        course.title.toLowerCase().includes(term) ||
+        course.instructor.toLowerCase().includes(term) ||
+        course.category.toLowerCase().includes(term);
 
       const matchesCategory =
         category === "All" || course.category === category;
 
-      const matchesLevel = level === "All" || course.level === level;
+      const matchesLevel =
+        level === "All" || course.level === level;
 
       return matchesSearch && matchesCategory && matchesLevel;
     });
   }, [courses, search, category, level]);
 
   const publishedCount = courses.filter(
-    (course) => course.status === "Published",
+    (course) => course.status === "Published"
   ).length;
 
   const totalStudents = courses.reduce(
     (total, course) => total + course.students,
-    0,
+    0
   );
 
-  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
+  const handleDeleteCourse = async (
+    courseId: string,
+    courseTitle: string
+  ) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${courseTitle}"?`,
+      `Are you sure you want to delete "${courseTitle}"? This action cannot be undone.`
     );
 
     if (!confirmed) return;
 
-    try {
-      setDeletingId(courseId);
-      setError("");
+    setDeletingId(courseId);
+    setError("");
 
+    try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`,
+        apiUrl(`courses/${encodeURIComponent(courseId)}`),
         {
           method: "DELETE",
           credentials: "include",
-        },
+          headers: {
+            Accept: "application/json",
+          },
+        }
       );
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to delete course");
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            `Failed to delete course (${response.status})`
+        );
       }
 
-      setCourses((prev) => prev.filter((course) => course.id !== courseId));
-    } catch (error) {
-      console.error("Delete Course Error:", error);
+      setCourses((previous) =>
+        previous.filter((course) => course.id !== courseId)
+      );
+    } catch (err) {
+      console.error("Delete Course Error:", err);
 
       setError(
-        error instanceof Error ? error.message : "Failed to delete course",
+        err instanceof Error
+          ? err.message
+          : "Failed to delete course."
       );
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setCategory("All");
+    setLevel("All");
   };
 
   return (
@@ -155,11 +317,13 @@ export default function AdminCoursesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-[#967438]">Management</p>
+          <p className="text-sm font-medium text-[#967438]">
+            Management
+          </p>
 
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
             Courses
-          </h2>
+          </h1>
 
           <p className="mt-1 text-sm text-stone-500">
             Create, organize, and manage your Islamic courses.
@@ -168,199 +332,224 @@ export default function AdminCoursesPage() {
 
         <Link
           href="/admin/courses/new"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-[#d6b56d] focus:ring-offset-2"
         >
           <Plus className="h-4 w-4" />
           Add Course
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* Statistics */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-stone-500">Total Courses</p>
+        <StatCard
+          label="Total Courses"
+          value={loading ? "—" : courses.length.toLocaleString()}
+          icon={<BookOpen className="h-5 w-5" />}
+        />
 
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-              <BookOpen className="h-5 w-5" />
-            </div>
-          </div>
+        <StatCard
+          label="Published"
+          value={loading ? "—" : publishedCount.toLocaleString()}
+          icon={<Star className="h-5 w-5" />}
+        />
 
-          <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {loading ? "—" : courses.length}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-stone-500">Published</p>
-
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-              <Star className="h-5 w-5" />
-            </span>
-          </div>
-
-          <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {loading ? "—" : publishedCount}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-stone-500">Enrolled Students</p>
-
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-
-          <p className="mt-4 text-2xl font-semibold text-stone-900">
-            {loading ? "—" : totalStudents.toLocaleString()}
-          </p>
-        </div>
+        <StatCard
+          label="Enrolled Students"
+          value={loading ? "—" : totalStudents.toLocaleString()}
+          icon={<Users className="h-5 w-5" />}
+        />
       </div>
 
-      {/* Filters */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          {/* Search */}
+      {/* Error Message */}
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+
+            <div>
+              <p className="font-semibold">
+                Something went wrong
+              </p>
+
+              <p className="mt-1 break-words">{error}</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void fetchCourses()}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 font-medium text-red-800 transition hover:bg-red-100"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Search and Filters */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
 
             <input
-              type="text"
+              type="search"
               placeholder="Search courses or instructors..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
+              aria-label="Search courses or instructors"
               className="h-11 w-full rounded-xl border border-stone-200 bg-[#faf9f6] pl-10 pr-4 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20"
             />
           </div>
 
-          {/* Category */}
           <div className="relative">
             <SlidersHorizontal className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
 
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="h-11 w-full appearance-none rounded-xl border border-stone-200 bg-[#faf9f6] pl-10 pr-8 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 md:w-40"
+              onChange={(event) => setCategory(event.target.value)}
+              aria-label="Filter by category"
+              className="h-11 w-full appearance-none rounded-xl border border-stone-200 bg-[#faf9f6] pl-10 pr-8 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 md:w-44"
             >
               <option value="All">All Categories</option>
-              <option value="Quran">Quran</option>
-              <option value="Hadith">Hadith</option>
-              <option value="Arabic">Arabic</option>
-              <option value="Fiqh">Fiqh</option>
-              <option value="Seerah">Seerah</option>
-              <option value="Islamic Studies">Islamic Studies</option>
+
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Level */}
           <select
             value={level}
-            onChange={(e) => setLevel(e.target.value)}
-            className="h-11 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-4 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 md:w-40"
+            onChange={(event) => setLevel(event.target.value)}
+            aria-label="Filter by level"
+            className="h-11 w-full rounded-xl border border-stone-200 bg-[#faf9f6] px-3 text-sm text-stone-700 outline-none focus:border-[#d6b56d] focus:ring-2 focus:ring-[#d6b56d]/20 md:w-40"
           >
             <option value="All">All Levels</option>
-            <option value="Beginner">Beginner</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Advanced">Advanced</option>
+
+            {levels.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
           </select>
         </div>
-      </div>
 
-      {/* Error */}
-      {!loading && error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-          <p className="font-medium text-red-800">Failed to load courses</p>
+        {(search || category !== "All" || level !== "All") && (
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-stone-100 pt-3">
+            <p className="text-xs text-stone-500">
+              Showing {filteredCourses.length} of {courses.length} courses
+            </p>
 
-          <p className="mt-1 text-sm text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs font-semibold text-[#967438] transition hover:text-stone-900"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Courses Table */}
+      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-stone-900">
+              All Courses
+            </h2>
+
+            <p className="mt-1 text-xs text-stone-500">
+              {loading
+                ? "Loading courses…"
+                : `${filteredCourses.length} course${filteredCourses.length === 1 ? "" : "s"} found`}
+            </p>
+          </div>
 
           <button
-            onClick={() => window.location.reload()}
-            className="mt-4 rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+            type="button"
+            onClick={() => void fetchCourses()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Try Again
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
           </button>
         </div>
-      )}
 
-      {/* Loading */}
-      {loading && (
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-          <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full">
-              <tbody>
-                {[1, 2, 3, 4, 5].map((item) => (
-                  <tr
-                    key={item}
-                    className="animate-pulse border-b border-stone-100"
-                  >
-                    <td className="px-6 py-6">
-                      <div className="h-5 w-64 rounded bg-stone-200" />
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="h-5 w-20 rounded bg-stone-200" />
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="h-5 w-32 rounded bg-stone-200" />
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="h-5 w-16 rounded bg-stone-200" />
-                    </td>
-                    <td className="px-6 py-6">
-                      <div className="h-6 w-20 rounded-full bg-stone-200" />
-                    </td>
-                    <td />
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divide-y divide-stone-100 lg:hidden">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className="animate-pulse p-5">
-                <div className="h-5 w-2/3 rounded bg-stone-200" />
-                <div className="mt-3 h-4 w-1/3 rounded bg-stone-200" />
-                <div className="mt-4 h-5 w-1/2 rounded bg-stone-200" />
-              </div>
+        {/* Loading State */}
+        {loading ? (
+          <div
+            className="space-y-3 p-5"
+            aria-label="Loading courses"
+          >
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-16 animate-pulse rounded-xl bg-stone-100"
+              />
             ))}
           </div>
-        </div>
-      )}
+        ) : filteredCourses.length === 0 ? (
+          /* Empty State */
+          <div className="flex flex-col items-center px-5 py-14 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-100 text-stone-500">
+              <GraduationCap className="h-7 w-7" />
+            </div>
 
-      {/* Courses */}
-      {!loading && !error && (
-        <>
-          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <h3 className="mt-4 font-semibold text-stone-900">
+              {courses.length === 0
+                ? "No courses yet"
+                : "No matching courses"}
+            </h3>
+
+            <p className="mt-1 max-w-sm text-sm text-stone-500">
+              {courses.length === 0
+                ? "Add your first course to start building your course library."
+                : "Try changing your search or filters to find a course."}
+            </p>
+
+            {courses.length === 0 ? (
+              <Link
+                href="/admin/courses/new"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-stone-800"
+              >
+                <Plus className="h-4 w-4" />
+                Add Course
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="mt-5 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
             {/* Desktop Table */}
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-stone-100 bg-stone-50/70">
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Course
-                    </th>
-
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Category
-                    </th>
-
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Instructor
-                    </th>
-
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Students
-                    </th>
-
-                    <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Status
-                    </th>
-
-                    <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-stone-500">
-                      Action
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[850px] text-left">
+                <thead className="bg-[#faf9f6]">
+                  <tr className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                    <th className="px-5 py-3.5">Course</th>
+                    <th className="px-4 py-3.5">Instructor</th>
+                    <th className="px-4 py-3.5">Level</th>
+                    <th className="px-4 py-3.5">Students</th>
+                    <th className="px-4 py-3.5">Price</th>
+                    <th className="px-4 py-3.5">Status</th>
+                    <th className="px-5 py-3.5 text-right">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -369,87 +558,78 @@ export default function AdminCoursesPage() {
                   {filteredCourses.map((course) => (
                     <tr
                       key={course.id}
-                      className="transition hover:bg-stone-50/60"
+                      className="transition hover:bg-[#fdfcf9]"
                     >
-                      <td className="px-6 py-5">
-                        <Link href={`/admin/courses/${course.id}`} className="flex items-center gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
+                      <td className="px-5 py-4">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f5f0e5] text-[#967438]">
                             <BookOpen className="h-5 w-5" />
                           </div>
 
-                          <div>
-                            <p className="text-sm font-medium text-stone-900">
+                          <div className="min-w-0">
+                            <Link
+                              href={`/admin/courses/${encodeURIComponent(course.id)}`}
+                              className="block max-w-[280px] truncate text-sm font-semibold text-stone-900 hover:text-[#967438]"
+                            >
                               {course.title}
+                            </Link>
+
+                            <p className="mt-1 text-xs text-stone-500">
+                              {course.category} · {course.lessons} lessons ·{" "}
+                              {course.duration}
                             </p>
-
-                            <div className="mt-1 flex items-center gap-3 text-xs text-stone-400">
-                              <span className="flex items-center gap-1">
-                                <Clock3 className="h-3.5 w-3.5" />
-                                {course.duration}
-                              </span>
-
-                              <span>{course.lessons} lessons</span>
-                            </div>
                           </div>
-                        </Link>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <div>
-                          <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                            {course.category}
-                          </span>
-
-                          <p className="mt-2 text-xs text-stone-400">
-                            {course.level}
-                          </p>
                         </div>
                       </td>
 
-                      <td className="px-6 py-5 text-sm text-stone-600">
+                      <td className="px-4 py-4 text-sm text-stone-600">
                         {course.instructor}
                       </td>
 
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-1.5 text-sm text-stone-700">
-                          <Users className="h-4 w-4 text-stone-400" />
-                          {course.students}
-                        </div>
+                      <td className="px-4 py-4 text-sm text-stone-600">
+                        {course.level}
                       </td>
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                            course.status === "Published"
-                              ? "bg-stone-900 text-white"
-                              : "bg-stone-100 text-stone-500"
-                          }`}
-                        >
-                          {course.status}
-                        </span>
+                      <td className="px-4 py-4 text-sm tabular-nums text-stone-600">
+                        {course.students.toLocaleString()}
                       </td>
 
-                      <td className="px-6 py-5 text-right">
+                      <td className="px-4 py-4 text-sm font-medium text-stone-800">
+                        {course.price === 0
+                          ? "Free"
+                          : `Rs. ${course.price.toLocaleString()}`}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <StatusPill status={course.status} />
+                      </td>
+
+                      <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <Link
-                            href={`/admin/courses/${course.id}/edit`}
+                            href={`/admin/courses/${encodeURIComponent(course.id)}/edit`}
+                            title="Edit course"
                             aria-label={`Edit ${course.title}`}
-                            className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
                           >
                             <Pencil className="h-4 w-4" />
                           </Link>
 
                           <button
                             type="button"
-                            aria-label={`Delete ${course.title}`}
                             onClick={() =>
-                              handleDeleteCourse(course.id, course.title)
+                              void handleDeleteCourse(
+                                course.id,
+                                course.title
+                              )
                             }
                             disabled={deletingId === course.id}
-                            className="rounded-lg p-2 text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            title="Delete course"
+                            aria-label={`Delete ${course.title}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {deletingId === course.id ? (
-                              <span className="block h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-red-500" />
+                              <RefreshCw className="h-4 w-4 animate-spin" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
                             )}
@@ -462,100 +642,164 @@ export default function AdminCoursesPage() {
               </table>
             </div>
 
-            {/* Mobile */}
-            <div className="divide-y divide-stone-100 lg:hidden">
+            {/* Mobile Cards */}
+            <div className="divide-y divide-stone-100 md:hidden">
               {filteredCourses.map((course) => (
-                <div key={course.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <Link href={`/admin/courses/${course.id}`} className="flex min-w-0 gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-                        <BookOpen className="h-5 w-5" />
-                      </div>
+                <article key={course.id} className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f5f0e5] text-[#967438]">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
 
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-stone-900">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <Link
+                          href={`/admin/courses/${encodeURIComponent(course.id)}`}
+                          className="font-semibold text-stone-900 hover:text-[#967438]"
+                        >
                           {course.title}
-                        </p>
+                        </Link>
 
-                        <p className="mt-1 truncate text-xs text-stone-500">
-                          {course.instructor}
-                        </p>
+                        <StatusPill status={course.status} />
                       </div>
-                    </Link>
 
-                    <div className="flex items-center gap-1">
+                      <p className="mt-1 text-xs text-stone-500">
+                        {course.category} · {course.level}
+                      </p>
+
+                      <p className="mt-2 text-sm text-stone-600">
+                        {course.instructor}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-[#faf9f6] p-3">
+                    <MobileMetric
+                      icon={<Users className="h-3.5 w-3.5" />}
+                      label="Students"
+                      value={course.students.toLocaleString()}
+                    />
+
+                    <MobileMetric
+                      icon={<BookOpen className="h-3.5 w-3.5" />}
+                      label="Lessons"
+                      value={String(course.lessons)}
+                    />
+
+                    <MobileMetric
+                      icon={<Clock3 className="h-3.5 w-3.5" />}
+                      label="Duration"
+                      value={course.duration}
+                    />
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-stone-900">
+                      {course.price === 0
+                        ? "Free"
+                        : `Rs. ${course.price.toLocaleString()}`}
+                    </p>
+
+                    <div className="flex items-center gap-2">
                       <Link
-                        href={`/admin/courses/${course.id}/edit`}
-                        aria-label={`Edit ${course.title}`}
-                        className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
+                        href={`/admin/courses/${encodeURIComponent(course.id)}/edit`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
                       </Link>
 
                       <button
                         type="button"
-                        aria-label={`Delete ${course.title}`}
                         onClick={() =>
-                          handleDeleteCourse(course.id, course.title)
+                          void handleDeleteCourse(
+                            course.id,
+                            course.title
+                          )
                         }
                         disabled={deletingId === course.id}
-                        className="rounded-lg p-2 text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                       >
                         {deletingId === course.id ? (
-                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-red-500" />
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         )}
+                        Delete
                       </button>
                     </div>
                   </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700">
-                      {course.category}
-                    </span>
-
-                    <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs text-stone-500">
-                      {course.level}
-                    </span>
-
-                    <span
-                      className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                        course.status === "Published"
-                          ? "bg-stone-900 text-white"
-                          : "bg-stone-100 text-stone-500"
-                      }`}
-                    >
-                      {course.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between text-xs text-stone-400">
-                    <span className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5" />
-                      {course.students} students
-                    </span>
-
-                    <span>{course.lessons} lessons</span>
-
-                    <span>Rs. {course.price.toLocaleString()}</span>
-                  </div>
-                </div>
+                </article>
               ))}
-
-              {filteredCourses.length === 0 && (
-                <div className="px-6 py-12 text-center text-sm text-stone-500">
-                  No courses found.
-                </div>
-              )}
             </div>
-          </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
 
-          <p className="text-xs text-stone-400">
-            Showing {filteredCourses.length} of {courses.length} courses
-          </p>
-        </>
-      )}
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-stone-500">{label}</p>
+
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
+          {icon}
+        </div>
+      </div>
+
+      <p className="mt-4 text-2xl font-semibold text-stone-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: CourseStatus }) {
+  const published = status === "Published";
+
+  return (
+    <span
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${
+        published
+          ? "bg-emerald-50 text-emerald-700"
+          : "bg-amber-50 text-amber-700"
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function MobileMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1 text-stone-400">
+        {icon}
+        <span className="text-[11px]">{label}</span>
+      </div>
+
+      <p className="mt-1 truncate text-xs font-semibold text-stone-800">
+        {value}
+      </p>
     </div>
   );
 }
